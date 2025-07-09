@@ -1,0 +1,165 @@
+:root {
+    --tg-theme-bg-color: #fff;
+    --tg-theme-text-color: #000;
+    --tg-theme-hint-color: #999;
+    --tg-theme-link-color: #2678b6;
+    --tg-theme-button-color: #2678b6;
+    --tg-theme-button-text-color: #fff;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 16px;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+}
+
+.schedule-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.day-header {
+    font-weight: bold;
+    padding: 8px;
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    border-radius: 8px;
+}
+
+.lesson-block {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.time-slot {
+    font-weight: bold;
+    color: var(--tg-theme-button-color);
+    margin-bottom: 4px;
+}
+
+.subject {
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.details {
+    font-size: 14px;
+    color: var(--tg-theme-hint-color);
+}
+
+.group-select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+}
+
+.nav-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.nav-button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    cursor: pointer;
+}
+
+.empty-schedule {
+    text-align: center;
+    padding: 20px;
+    color: var(--tg-theme-hint-color);
+}
+
+.current-date {
+    text-align: center;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 16px;
+    color: var(--tg-theme-hint-color);
+}
+
+.schedule-date {
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 16px;
+    color: var(--tg-theme-text-color);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.modal-content {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: var(--tg-theme-bg-color);
+    border-radius: 12px 12px 0 0;
+    padding: 20px;
+}
+
+.date-picker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.picker-wheels {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 0;
+}
+
+.wheel {
+    flex: 1;
+    height: 150px;
+    margin: 0 5px;
+    border: none;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    font-size: 16px;
+    text-align: center;
+}
+
+.picker-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.modal-button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+}
+
+.modal-button.confirm {
+    background-color: var(--tg-theme-button-color);
+} 

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расписание</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <select id="groupSelect" class="group-select">
+        <option value="">Выберите группу</option>
+    </select>
+
+    <div class="current-date">
+        Сегодня: <span id="todayDate"></span>
+    </div>
+
+    <div class="nav-buttons">
+        <button id="prev-day" class="nav-button">← Пред. день</button>
+        <button id="date-picker" class="nav-button date-picker-button">Выбрать дату</button>
+        <button id="next-day" class="nav-button">След. день →</button>
+    </div>
+
+    <div class="schedule-container" id="scheduleContainer">
+        <!-- Расписание будет добавлено через JavaScript -->
+    </div>
+
+    <div id="datePickerModal" class="modal">
+        <div class="modal-content">
+            <div class="date-picker-container">
+                <div class="picker-wheels">
+                    <select id="dayWheel" class="wheel"></select>
+                    <select id="monthWheel" class="wheel"></select>
+                    <select id="yearWheel" class="wheel"></select>
+                </div>
+                <div class="picker-buttons">
+                    <button id="cancelDate" class="modal-button">Отмена</button>
+                    <button id="confirmDate" class="modal-button confirm">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html> 

@@ -1,0 +1,4 @@
+RewriteEngine On
+
+# Все запросы на index.php
+RewriteRule ^(.*)$ index.php [L] 
