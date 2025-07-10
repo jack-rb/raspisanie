@@ -15,6 +15,71 @@ body {
     color: var(--tg-theme-text-color);
 }
 
+/* Кнопки выбора типа поиска */
+.search-type-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.search-type-button {
+    flex: 1;
+    padding: 12px 8px;
+    border: 2px solid var(--tg-theme-button-color);
+    border-radius: 8px;
+    background-color: transparent;
+    color: var(--tg-theme-button-color);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.search-type-button i {
+    font-size: 18px;
+}
+
+.search-type-button.active {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+}
+
+.search-type-button:hover {
+    background-color: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+    transform: translateY(-1px);
+}
+
+/* Секции поиска */
+.search-section {
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+}
+
+.search-section.hidden {
+    display: none;
+}
+
+.group-select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: var(--tg-theme-bg-color);
+    color: var(--tg-theme-text-color);
+    font-size: 16px;
+}
+
+.group-select:focus {
+    outline: none;
+    border-color: var(--tg-theme-button-color);
+    box-shadow: 0 0 0 2px rgba(38, 120, 182, 0.2);
+}
+
 .schedule-container {
     display: flex;
     flex-direction: column;
@@ -52,16 +117,6 @@ body {
     color: var(--tg-theme-hint-color);
 }
 
-.group-select {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 16px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    background-color: var(--tg-theme-bg-color);
-    color: var(--tg-theme-text-color);
-}
-
 .nav-buttons {
     display: flex;
     gap: 8px;
@@ -87,9 +142,18 @@ body {
 .current-date {
     text-align: center;
     padding: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     font-size: 16px;
     color: var(--tg-theme-hint-color);
+}
+
+.current-time {
+    text-align: center;
+    padding: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: var(--tg-theme-hint-color);
+    font-weight: 500;
 }
 
 .schedule-date {
@@ -98,6 +162,29 @@ body {
     font-weight: bold;
     margin-bottom: 16px;
     color: var(--tg-theme-text-color);
+}
+
+.teacher-info {
+    text-align: center;
+    padding: 8px;
+    margin-bottom: 8px;
+    background-color: #f0f8ff;
+    color: var(--tg-theme-button-color);
+    border-radius: 8px;
+    font-weight: 500;
+    border: 1px solid var(--tg-theme-button-color);
+}
+
+.clickable {
+    color: var(--tg-theme-link-color);
+    cursor: pointer;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.clickable:hover {
+    color: var(--tg-theme-button-color);
+    text-decoration: none;
 }
 
 .modal {

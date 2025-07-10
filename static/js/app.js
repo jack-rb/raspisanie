@@ -1,13 +1,8 @@
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-function getCurrentDateUTC4() {
-    const date = new Date();
-    return date;
-}
-
-let currentDate = getCurrentDateUTC4();
-let selectedGroupId = null;
+let selectedDate = new Date();
+let currentSearchType = 'group'; // 'group' или 'teacher'
 
 function formatDate(date, isToday = false) {
     const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
@@ -19,12 +14,28 @@ function formatDate(date, isToday = false) {
     if (isToday) {
         return `${day}, ${dd}.${mm}.${yyyy}`;
     }
-    return `${day} ${dd}.${mm}.${yyyy}`;
+    // Для API возвращаем формат YYYY-MM-DD
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 function updateTodayDate() {
     const todayElement = document.getElementById('todayDate');
-    todayElement.textContent = formatDate(getCurrentDateUTC4(), true);
+    const today = new Date();
+    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const day = days[today.getDay()];
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    todayElement.textContent = `${day}, ${dd}.${mm}.${yyyy}`;
+}
+
+function updateCurrentTime() {
+    const timeElement = document.getElementById('currentTime');
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    timeElement.textContent = `${hours}:${minutes}:${seconds}`;
 }
 
 function displaySchedule(schedule, selectedDate) {
@@ -34,15 +45,21 @@ function displaySchedule(schedule, selectedDate) {
     const dayHeader = document.createElement('div');
     dayHeader.className = 'day-header';
     
-    if (schedule && schedule.date) {
-        dayHeader.textContent = schedule.date;
-    } else {
-        const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-        const day = selectedDate.getDate().toString().padStart(2, '0');
-        const month = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
-        const year = selectedDate.getFullYear();
-        dayHeader.textContent = `${days[selectedDate.getDay()]} ${day}.${month}.${year}`;
+    // Всегда показываем дату в нужном формате
+    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+    const day = selectedDate.getDate().toString().padStart(2, '0');
+    const month = (selectedDate.getMonth() + 1).toString().padStart(2, '0');
+    const year = selectedDate.getFullYear();
+    dayHeader.textContent = `${days[selectedDate.getDay()]} ${day}.${month}.${year}`;
+    
+    // Добавляем информацию о преподавателе, если это расписание преподавателя
+    if (schedule && schedule.teacher) {
+        const teacherInfo = document.createElement('div');
+        teacherInfo.className = 'teacher-info';
+        teacherInfo.textContent = `Преподаватель: ${schedule.teacher}`;
+        container.appendChild(teacherInfo);
     }
+    
     container.appendChild(dayHeader);
 
     if (schedule && schedule.lessons && schedule.lessons.length > 0) {
@@ -51,14 +68,22 @@ function displaySchedule(schedule, selectedDate) {
             .forEach(lesson => {
                 const lessonBlock = document.createElement('div');
                 lessonBlock.className = 'lesson-block';
+                
+                // Формируем детали в зависимости от типа поиска
+                let details = `${lesson.type}<br>Аудитория: ${lesson.classroom}`;
+                
+                if (currentSearchType === 'teacher') {
+                    // Для расписания преподавателя показываем кликабельную группу
+                    details += `<br>Группа: <span class="clickable" data-type="group" data-value="${lesson.group_name}">${lesson.group_name}</span>`;
+                } else {
+                    // Для расписания группы показываем кликабельного преподавателя
+                    details += `<br>Преподаватель: <span class="clickable" data-type="teacher" data-value="${lesson.teacher}">${lesson.teacher}</span>`;
+                }
+                
                 lessonBlock.innerHTML = `
                     <div class="time-slot">${lesson.time}</div>
                     <div class="subject">${lesson.subject}</div>
-                    <div class="details">
-                        ${lesson.type}<br>
-                        Аудитория: ${lesson.classroom}<br>
-                        Преподаватель: ${lesson.teacher}
-                    </div>
+                    <div class="details">${details}</div>
                 `;
                 container.appendChild(lessonBlock);
             });
@@ -86,24 +111,20 @@ async function loadGroups() {
     }
 }
 
-async function loadSchedule() {
-    if (!selectedGroupId) return;
-
-    const adjustedDate = new Date(currentDate);
-    adjustedDate.setDate(adjustedDate.getDate() + 1);
-    const dateStr = adjustedDate.toISOString().split('T')[0];
-
+async function loadSchedule(groupId, date) {
+    const formattedDate = formatDate(date);
+    
     try {
-        const response = await fetch(`/groups/${selectedGroupId}/schedule/${dateStr}`);
+        const response = await fetch(`/schedule/${groupId}/${formattedDate}`);
         if (response.ok) {
             const schedule = await response.json();
-            displaySchedule(schedule, currentDate);
+            displaySchedule(schedule, date);
         } else {
-            displaySchedule(null, currentDate);
+            displaySchedule(null, date);
         }
     } catch (error) {
         console.error('Ошибка загрузки расписания:', error);
-        displaySchedule(null, currentDate);
+        displaySchedule(null, date);
     }
 }
 
@@ -120,7 +141,7 @@ function initDatePicker() {
         option.text = i.toString().padStart(2, '0');
         dayWheel.appendChild(option);
     }
-    dayWheel.value = today.getDate();
+    dayWheel.value = selectedDate.getDate();
     
     const months = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
                    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
@@ -130,7 +151,7 @@ function initDatePicker() {
         option.text = month;
         monthWheel.appendChild(option);
     });
-    monthWheel.value = today.getMonth() + 1;
+    monthWheel.value = selectedDate.getMonth() + 1;
     
     const currentYear = today.getFullYear();
     for (let year = currentYear - 1; year <= currentYear + 1; year++) {
@@ -139,61 +160,194 @@ function initDatePicker() {
         option.text = year.toString();
         yearWheel.appendChild(option);
     }
-    yearWheel.value = currentYear;
+    yearWheel.value = selectedDate.getFullYear();
 }
 
-// Event Listeners
-document.getElementById('groupSelect').addEventListener('change', (e) => {
-    selectedGroupId = e.target.value;
-    if (selectedGroupId) {
-        loadSchedule();
-    }
-});
-
-document.getElementById('prev-day').addEventListener('click', () => {
-    currentDate.setDate(currentDate.getDate() - 1);
-    loadSchedule();
-});
-
-document.getElementById('next-day').addEventListener('click', () => {
-    currentDate.setDate(currentDate.getDate() + 1);
-    loadSchedule();
-});
-
-document.getElementById('date-picker').addEventListener('click', () => {
+function showDatePicker() {
     document.getElementById('datePickerModal').style.display = 'block';
-});
+}
 
-document.getElementById('cancelDate').addEventListener('click', () => {
+function hideDatePicker() {
     document.getElementById('datePickerModal').style.display = 'none';
-});
+}
 
-document.getElementById('confirmDate').addEventListener('click', () => {
+function confirmDateSelection() {
     const day = document.getElementById('dayWheel').value;
     const month = document.getElementById('monthWheel').value;
     const year = document.getElementById('yearWheel').value;
     
-    currentDate = new Date(year, month - 1, day);
+    selectedDate = new Date(year, month - 1, day);
     
-    const dayHeader = document.createElement('div');
-    dayHeader.className = 'day-header';
+    updateSchedule();
+    hideDatePicker();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadGroups();
+    updateTodayDate();
+    updateCurrentTime();
+    setupEventListeners();
     
-    const days = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-    const dayName = days[currentDate.getDay()];
-    const formattedDate = `${dayName} ${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`;
-    dayHeader.textContent = formattedDate;
-    
-    const container = document.getElementById('scheduleContainer');
-    container.innerHTML = '';
-    container.appendChild(dayHeader);
-    
-    loadSchedule();
-    
-    document.getElementById('datePickerModal').style.display = 'none';
+    // Обновляем время каждую секунду
+    setInterval(updateCurrentTime, 1000);
 });
+
+function setupEventListeners() {
+    // Кнопки переключения типа поиска
+    document.getElementById('searchByGroup').addEventListener('click', () => switchSearchType('group'));
+    document.getElementById('searchByTeacher').addEventListener('click', () => switchSearchType('teacher'));
+    
+    // Выбор группы или преподавателя
+    document.getElementById('groupSelect').addEventListener('change', function() {
+        if (this.value) {
+            if (currentSearchType === 'group') {
+                loadSchedule(this.value, selectedDate);
+            } else {
+                loadScheduleByTeacher(this.value, selectedDate);
+            }
+        }
+    });
+    
+    // Обработчик кликов по кликабельным элементам
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('clickable')) {
+            const type = e.target.dataset.type;
+            const value = e.target.dataset.value;
+            
+            if (type === 'teacher') {
+                // Переключаемся на поиск по преподавателю
+                switchSearchType('teacher');
+                // Находим преподавателя в списке и выбираем его
+                setTimeout(() => {
+                    const select = document.getElementById('groupSelect');
+                    const options = Array.from(select.options);
+                    const teacherOption = options.find(option => option.textContent === value);
+                    if (teacherOption) {
+                        select.value = teacherOption.value;
+                        loadScheduleByTeacher(teacherOption.value, selectedDate);
+                    }
+                }, 100);
+            } else if (type === 'group') {
+                // Переключаемся на поиск по группе
+                switchSearchType('group');
+                // Находим группу в списке и выбираем её
+                setTimeout(() => {
+                    const select = document.getElementById('groupSelect');
+                    const options = Array.from(select.options);
+                    const groupOption = options.find(option => option.textContent === value);
+                    if (groupOption) {
+                        select.value = groupOption.value;
+                        loadSchedule(groupOption.value, selectedDate);
+                    }
+                }, 100);
+            }
+        }
+    });
+    
+    // Навигация по дням
+    document.getElementById('prev-day').addEventListener('click', () => {
+        selectedDate.setDate(selectedDate.getDate() - 1);
+        updateSchedule();
+    });
+    
+    document.getElementById('next-day').addEventListener('click', () => {
+        selectedDate.setDate(selectedDate.getDate() + 1);
+        updateSchedule();
+    });
+    
+    // Выбор даты
+    document.getElementById('date-picker').addEventListener('click', showDatePicker);
+    document.getElementById('confirmDate').addEventListener('click', confirmDateSelection);
+    document.getElementById('cancelDate').addEventListener('click', hideDatePicker);
+}
+
+function switchSearchType(type) {
+    currentSearchType = type;
+    
+    // Обновляем активную кнопку
+    document.getElementById('searchByGroup').classList.toggle('active', type === 'group');
+    document.getElementById('searchByTeacher').classList.toggle('active', type === 'teacher');
+    
+    // Обновляем содержимое выпадающего списка
+    updateSelectContent(type);
+    
+    // Очищаем расписание при переключении
+    document.getElementById('scheduleContainer').innerHTML = '';
+    
+    // Сбрасываем выбор
+    document.getElementById('groupSelect').value = '';
+}
+
+function updateSelectContent(type) {
+    const select = document.getElementById('groupSelect');
+    
+    if (type === 'group') {
+        // Загружаем группы
+        loadGroups();
+        select.placeholder = 'Выберите группу';
+    } else {
+        // Загружаем преподавателей
+        loadTeachers();
+        select.placeholder = 'Выберите преподавателя';
+    }
+}
+
+function updateSchedule() {
+    const selectedId = document.getElementById('groupSelect').value;
+    if (selectedId) {
+        if (currentSearchType === 'group') {
+            loadSchedule(selectedId, selectedDate);
+        } else {
+            loadScheduleByTeacher(selectedId, selectedDate);
+        }
+    }
+}
+
+function loadScheduleByTeacher(teacherId, date) {
+    const formattedDate = formatDate(date);
+    fetch(`/schedule/teacher/${teacherId}/${formattedDate}`)
+        .then(response => response.json())
+        .then(schedule => {
+            displaySchedule(schedule, date);
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки расписания преподавателя:', error);
+            document.getElementById('scheduleContainer').innerHTML = 
+                '<div class="empty-schedule">Ошибка загрузки расписания</div>';
+        });
+}
+
+function loadTeachers() {
+    fetch('/teachers/')
+        .then(response => response.json())
+        .then(teachers => {
+            const select = document.getElementById('groupSelect');
+            select.innerHTML = '<option value="">Выберите преподавателя</option>';
+            teachers.forEach(teacher => {
+                const option = document.createElement('option');
+                option.value = teacher.id;
+                option.textContent = teacher.name;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Ошибка загрузки преподавателей:', error);
+        });
+}
 
 // Инициализация
 tg.ready();
-updateTodayDate();
-loadGroups();
+
+// Добавляем initData в заголовки для всех запросов
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+    if (tg.initData) {
+        options.headers = {
+            ...options.headers,
+            'X-Telegram-Init-Data': tg.initData
+        };
+    }
+    return originalFetch(url, options);
+};
+
 initDatePicker(); 

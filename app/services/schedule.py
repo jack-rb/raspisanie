@@ -17,11 +17,10 @@ class ScheduleService:
                 SELECT d.id, d.date, d.group_id, l.id as lesson_id, l.time, l.subject, l.type, l.classroom, l.teacher
                 FROM days d
                 LEFT JOIN lessons l ON l.day_id = d.id
-                WHERE d.group_id = :group_id AND d.date LIKE :date
+                WHERE d.group_id = :group_id AND d.date = :date
             """)
             
-            formatted_date = f"%{date.split('-')[2]}.{date.split('-')[1]}.{date.split('-')[0]}"
-            result = db.execute(query, {"group_id": group_id, "date": formatted_date})
+            result = db.execute(query, {"group_id": group_id, "date": date})
             
             schedule_data = result.fetchall()
             print("Данные расписания:", schedule_data)  # Отладка
@@ -48,6 +47,66 @@ class ScheduleService:
         except Exception as e:
             print(f"Ошибка получения расписания: {e}")
             return None
+    
+    @staticmethod
+    def get_schedule_by_teacher_and_date(db: Session, teacher_id: int, date: str):
+        try:
+            # Получаем имя преподавателя по ID
+            teacher_query = text("SELECT DISTINCT teacher FROM lessons WHERE teacher IS NOT NULL")
+            teachers_result = db.execute(teacher_query)
+            teachers = [{"id": i+1, "name": row[0]} for i, row in enumerate(teachers_result)]
+            
+            if teacher_id > len(teachers):
+                return None
+                
+            teacher_name = teachers[teacher_id - 1]["name"]
+            
+            # Получаем расписание преподавателя
+            query = text("""
+                SELECT d.id, d.date, d.group_id, g.name as group_name, l.id as lesson_id, l.time, l.subject, l.type, l.classroom, l.teacher
+                FROM days d
+                JOIN groups g ON d.group_id = g.id
+                LEFT JOIN lessons l ON l.day_id = d.id
+                WHERE l.teacher = :teacher AND d.date = :date
+            """)
+            
+            result = db.execute(query, {"teacher": teacher_name, "date": date})
+            
+            schedule_data = result.fetchall()
+            
+            if schedule_data:
+                return {
+                    "id": schedule_data[0][0],
+                    "date": schedule_data[0][1],
+                    "teacher": teacher_name,
+                    "lessons": [
+                        {
+                            "id": row[4],
+                            "time": row[5],
+                            "subject": row[6],
+                            "type": row[7],
+                            "classroom": row[8],
+                            "teacher": row[9],
+                            "group_name": row[3]
+                        }
+                        for row in schedule_data if row[5] is not None
+                    ]
+                }
+            return None
+        except Exception as e:
+            print(f"Ошибка получения расписания преподавателя: {e}")
+            return None
+    
+    @staticmethod
+    def get_all_teachers(db: Session) -> List[dict]:
+        try:
+            query = text("SELECT DISTINCT teacher FROM lessons WHERE teacher IS NOT NULL AND teacher != '' ORDER BY teacher")
+            result = db.execute(query)
+            teachers = [{"id": i+1, "name": row[0]} for i, row in enumerate(result)]
+            return teachers
+        except Exception as e:
+            print(f"Ошибка получения преподавателей: {e}")
+            return []
     
     @staticmethod
     def get_lessons_by_day_id(db: Session, day_id: int) -> List[Lesson]:

@@ -36,4 +36,27 @@ venv/
 .env
 
 # Logs
-*.log 
+*.log
+
+# Test and development files
+create_test_data.py
+check_python.py
+create_db.py
+import_data.py
+import_original_data.py
+init_db.py
+inspect_db.py
+migrate_db.py
+test_bot.py
+test.php
+index.php
+passenger_wsgi.py
+run.py
+schedule-bot_v0.3.tar.gz
+Dockerfile.backend
+Dockerfile.frontend
+Makefile
+.htaccess
+
+# Data directory (but keep structure)
+data/*.db 
