@@ -169,11 +169,13 @@ async def secure_endpoint(
 # Запуск бота при старте приложения
 @app.on_event("startup")
 async def startup_event():
-    # Запуск бота
-    dp = setup_bot()
-    asyncio.create_task(dp.start_polling(bot))
+    # Запуск бота по флагу окружения (чтобы не мешал тестам/локальному запуску)
+    if os.getenv("RUN_BOT", "false").lower() == "true":
+        dp = setup_bot()
+        asyncio.create_task(dp.start_polling(bot))
 
 # Закрытие сессии бота при остановке приложения
 @app.on_event("shutdown")
 async def shutdown_event():
-    await bot.session.close() 
+    if os.getenv("RUN_BOT", "false").lower() == "true":
+        await bot.session.close() 

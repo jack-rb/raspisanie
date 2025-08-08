@@ -9,8 +9,19 @@ variables:
   DOCKER_DRIVER: overlay2
 
 stages:
+  - test
   - build
   - deploy
+
+unit-tests:
+  image: python:3.11-slim
+  stage: test
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+  before_script:
+    - pip install --no-cache-dir -r requirements.txt pytest
+  script:
+    - pytest
 
 build-image:
   stage: build
@@ -29,7 +40,7 @@ deploy:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $SSH_HOST && $SSH_USER && $SSH_PRIVATE_KEY'
   before_script:
-    - apk add --no-cache openssh-client bash
+    - apk add --no-cache openssh-client bash curl
     - eval $(ssh-agent -s)
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -41,7 +52,7 @@ deploy:
       mkdir -p /opt/schedule-bot/data
 
       # Ensure docker compose plugin exists
-      if ! docker compose version >/dev/null 2>&1; then
+      if ! docker compose version >/dev/null 2/*1; then
         mkdir -p /usr/local/lib/docker/cli-plugins
         curl -fsSL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
         chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
