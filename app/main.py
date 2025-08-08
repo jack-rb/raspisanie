@@ -62,13 +62,14 @@ async def root():
 
 @app.get("/test_db")
 @limiter.limit("5/second;100/hour")
-async def test_db(db: Session = Depends(get_db)):
+async def test_db(request: Request, db: Session = Depends(get_db)):
     groups = ScheduleService.get_all_groups(db)
     return {"groups_count": len(groups), "groups": groups}
 
 @app.get("/groups/", response_model=List[Group])
 @limiter.limit("5/second;100/hour")
 async def get_groups(
+    request: Request,
     verified: bool = Depends(verify_init_data),
     db: Session = Depends(get_db)
 ):
@@ -79,6 +80,7 @@ async def get_groups(
 @app.get("/groups/{group_id}/schedule/{date}", response_model=Day)
 @limiter.limit("5/second;100/hour")
 async def get_schedule(
+    request: Request,
     group_id: int,
     date: str,
     verified: bool = Depends(verify_init_data),
@@ -104,6 +106,7 @@ async def get_teachers(db: Session = Depends(get_db)):
 @app.get("/teachers/{teacher_name}/schedule/{date}")
 @limiter.limit("5/second;100/hour")
 async def get_teacher_schedule(
+    request: Request,
     teacher_name: str = Path(..., description="ФИО преподавателя"),
     date: str = Path(..., description="Дата в формате YYYY-MM-DD"),
     verified: bool = Depends(verify_init_data),
@@ -144,6 +147,7 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
 @app.post("/secure-endpoint")
 @limiter.limit("5/second;100/hour")
 async def secure_endpoint(
+    request: Request,
     verified: bool = Depends(verify_init_data),
     db: Session = Depends(get_db)
 ):
