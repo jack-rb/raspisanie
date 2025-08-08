@@ -56,6 +56,33 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Монтируем статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# --- Проверка Init Data (перенесена выше, до использования в Depends) ---
+TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+def check_telegram_init_data(init_data: str) -> bool:
+    if not TELEGRAM_BOT_TOKEN:
+        return False
+    data = dict(parse_qsl(init_data, strict_parsing=True))
+    hash_ = data.pop('hash', None)
+    data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+    secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
+    hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    return hmac_string == hash_
+
+async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
+    init_data = None
+    try:
+        body = await request.json()
+        init_data = body.get("initData") or body.get("init_data")
+    except Exception:
+        pass  # body может отсутствовать для GET
+    if not init_data:
+        init_data = x_telegram_initdata
+    if not init_data or not check_telegram_init_data(init_data):
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+    return True
+# --- Конец блока проверки Init Data ---
+
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
@@ -116,32 +143,6 @@ async def get_teacher_schedule(
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return schedule
-
-# Проверка Init Data
-TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-def check_telegram_init_data(init_data: str) -> bool:
-    if not TELEGRAM_BOT_TOKEN:
-        return False
-    data = dict(parse_qsl(init_data, strict_parsing=True))
-    hash_ = data.pop('hash', None)
-    data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
-    secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
-    hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return hmac_string == hash_
-
-async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
-    init_data = None
-    try:
-        body = await request.json()
-        init_data = body.get("initData") or body.get("init_data")
-    except Exception:
-        pass  # body может отсутствовать для GET
-    if not init_data:
-        init_data = x_telegram_initdata
-    if not init_data or not check_telegram_init_data(init_data):
-        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
-    return True
 
 # Пример защищённого эндпоинта
 @app.post("/secure-endpoint")
