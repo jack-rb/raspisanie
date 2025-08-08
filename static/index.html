@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+    <div class="mode-switcher">
+        <button id="groupsBtn" class="mode-btn active" title="Группы">
+            <!-- SVG: 3 человечка -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="10" r="3" fill="#2678b6"/><circle cx="18" cy="10" r="3" fill="#2678b6"/><circle cx="12" cy="6" r="3" fill="#2678b6"/></svg>
+        </button>
+        <button id="teachersBtn" class="mode-btn" title="Преподаватели">
+            <!-- SVG: 1 человечек -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#2678b6"/><rect x="6" y="14" width="12" height="6" rx="3" fill="#2678b6"/></svg>
+        </button>
+    </div>
+
     <select id="groupSelect" class="group-select">
         <option value="">Выберите группу</option>
     </select>

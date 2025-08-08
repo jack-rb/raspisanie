@@ -61,6 +61,50 @@ class ScheduleService:
         print("Группы из БД:", groups)  # Отладка
         return groups
     
+    @staticmethod
+    def get_all_teachers(db: Session) -> list:
+        # Получаем уникальные имена преподавателей из lessons
+        result = db.execute(text("SELECT DISTINCT teacher FROM lessons WHERE teacher IS NOT NULL AND teacher != '' ORDER BY teacher ASC"))
+        teachers = [{"name": row[0]} for row in result]
+        return teachers
+    
+    @staticmethod
+    def get_teacher_schedule_by_date(db: Session, teacher_name: str, date: str) -> Optional[dict]:
+        try:
+            # Прямой SQL запрос для получения уроков преподавателя на дату
+            query = text("""
+                SELECT l.id, l.day_id, l.time, l.subject, l.type, l.classroom, l.teacher, d.date, d.group_id
+                FROM lessons l
+                JOIN days d ON l.day_id = d.id
+                WHERE l.teacher = :teacher_name AND d.date LIKE :date
+                ORDER BY l.time ASC
+            """)
+            formatted_date = f"%{date.split('-')[2]}.{date.split('-')[1]}.{date.split('-')[0]}"
+            result = db.execute(query, {"teacher_name": teacher_name, "date": formatted_date})
+            lessons_data = result.fetchall()
+            if lessons_data:
+                return {
+                    "date": lessons_data[0][7],
+                    "teacher": teacher_name,
+                    "lessons": [
+                        {
+                            "id": row[0],
+                            "day_id": row[1],
+                            "time": row[2],
+                            "subject": row[3],
+                            "type": row[4],
+                            "classroom": row[5],
+                            "teacher": row[6],
+                            "group_id": row[8]
+                        }
+                        for row in lessons_data
+                    ]
+                }
+            return None
+        except Exception as e:
+            print(f"Ошибка получения расписания преподавателя: {e}")
+            return None
+    
     def create_test_data(db: Session):
         # Создаем группу
         group = Group(name="ИС-31")

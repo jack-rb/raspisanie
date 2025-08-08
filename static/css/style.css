@@ -141,6 +141,15 @@ body {
     color: var(--tg-theme-text-color);
     font-size: 16px;
     text-align: center;
+    /* Кастомные стрелки для select */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%232678b6" height="16" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 20px 20px;
+    padding-right: 32px;
 }
 
 .picker-buttons {
@@ -162,4 +171,73 @@ body {
 
 .modal-button.confirm {
     background-color: var(--tg-theme-button-color);
+}
+
+.mode-switcher {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.mode-btn {
+    background: var(--tg-theme-bg-color);
+    border: 2px solid var(--tg-theme-button-color);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mode-btn.active {
+    background: var(--tg-theme-button-color);
+    color: var(--tg-theme-button-text-color);
+}
+.mode-btn svg {
+    display: block;
+}
+
+@media (max-width: 600px) {
+    .modal-content {
+        padding: 8px;
+        border-radius: 10px 10px 0 0;
+    }
+    .date-picker-container {
+        gap: 10px;
+    }
+    .picker-wheels {
+        padding: 10px 0;
+        gap: 4px;
+    }
+    .wheel {
+        height: 40px;
+        font-size: 14px;
+        margin: 0 2px;
+        min-width: 0;
+        padding: 6px 24px 6px 6px;
+    }
+    .picker-buttons {
+        gap: 4px;
+    }
+    .modal-button {
+        padding: 8px;
+        font-size: 14px;
+    }
+}
+
+/* Для очень маленьких экранов */
+@media (max-width: 400px) {
+    .modal-content {
+        padding: 4px;
+    }
+    .wheel {
+        font-size: 12px;
+        height: 32px;
+        padding: 4px 18px 4px 4px;
+    }
+    .modal-button {
+        font-size: 12px;
+        padding: 6px;
+    }
 } 

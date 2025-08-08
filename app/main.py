@@ -1,16 +1,57 @@
 import asyncio
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
+import os
+import hmac
+import hashlib
+from urllib.parse import parse_qsl
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .core.database import get_db
 from .services.schedule import ScheduleService
-from .schemas.schedule import Group, Day, Lesson
+from .schemas.schedule import Group, Day, Lesson, Teacher
 from .bot.bot import bot, setup_bot
 
 app = FastAPI(title="Schedule API")
+
+# CORS: разрешаем только Telegram WebApp (можно расширить список)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://web.telegram.org", "https://web.telegram.org/", "https://t.me"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+# --- SlowAPI Limiter ---
+# Кастомная функция для извлечения user_id из Init Data
+
+def get_user_id_from_init_data(request: Request):
+    init_data = None
+    try:
+        body = request._body if hasattr(request, '_body') else None
+        if not body:
+            body = request.json()
+        if isinstance(body, dict):
+            init_data = body.get("initData") or body.get("init_data")
+    except Exception:
+        pass
+    if not init_data:
+        init_data = request.headers.get("x-telegram-initdata")
+    if init_data:
+        data = dict(parse_qsl(init_data, strict_parsing=True))
+        return str(data.get("user\_id", "anonymous"))
+    return "anonymous"
+
+limiter = Limiter(key_func=get_user_id_from_init_data)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Монтируем статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -20,20 +61,27 @@ async def root():
     return FileResponse("static/index.html")
 
 @app.get("/test_db")
+@limiter.limit("5/second;100/hour")
 async def test_db(db: Session = Depends(get_db)):
     groups = ScheduleService.get_all_groups(db)
     return {"groups_count": len(groups), "groups": groups}
 
 @app.get("/groups/", response_model=List[Group])
-async def get_groups(db: Session = Depends(get_db)):
+@limiter.limit("5/second;100/hour")
+async def get_groups(
+    verified: bool = Depends(verify_init_data),
+    db: Session = Depends(get_db)
+):
     groups = ScheduleService.get_all_groups(db)
     print("Получены группы из БД:", groups)  # Отладка
     return groups
 
 @app.get("/groups/{group_id}/schedule/{date}", response_model=Day)
+@limiter.limit("5/second;100/hour")
 async def get_schedule(
     group_id: int,
     date: str,
+    verified: bool = Depends(verify_init_data),
     db: Session = Depends(get_db)
 ):
     print(f"Запрос расписания для группы {group_id} на дату {date}")  # Отладка
@@ -47,6 +95,60 @@ async def get_schedule(
 @app.get("/days/{day_id}/lessons", response_model=List[Lesson])
 async def get_lessons(day_id: int, db: Session = Depends(get_db)):
     return ScheduleService.get_lessons_by_day_id(db, day_id)
+
+@app.get("/teachers/", response_model=List[Teacher])
+async def get_teachers(db: Session = Depends(get_db)):
+    teachers = ScheduleService.get_all_teachers(db)
+    return teachers
+
+@app.get("/teachers/{teacher_name}/schedule/{date}")
+@limiter.limit("5/second;100/hour")
+async def get_teacher_schedule(
+    teacher_name: str = Path(..., description="ФИО преподавателя"),
+    date: str = Path(..., description="Дата в формате YYYY-MM-DD"),
+    verified: bool = Depends(verify_init_data),
+    db: Session = Depends(get_db)
+):
+    schedule = ScheduleService.get_teacher_schedule_by_date(db, teacher_name, date)
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return schedule
+
+# Проверка Init Data
+TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+def check_telegram_init_data(init_data: str) -> bool:
+    if not TELEGRAM_BOT_TOKEN:
+        return False
+    data = dict(parse_qsl(init_data, strict_parsing=True))
+    hash_ = data.pop('hash', None)
+    data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+    secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
+    hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    return hmac_string == hash_
+
+async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
+    init_data = None
+    try:
+        body = await request.json()
+        init_data = body.get("initData") or body.get("init_data")
+    except Exception:
+        pass  # body может отсутствовать для GET
+    if not init_data:
+        init_data = x_telegram_initdata
+    if not init_data or not check_telegram_init_data(init_data):
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+    return True
+
+# Пример защищённого эндпоинта
+@app.post("/secure-endpoint")
+@limiter.limit("5/second;100/hour")
+async def secure_endpoint(
+    verified: bool = Depends(verify_init_data),
+    db: Session = Depends(get_db)
+):
+    # Ваш код для защищённого эндпоинта
+    return {"status": "ok"}
 
 # Запуск бота при старте приложения
 @app.on_event("startup")
