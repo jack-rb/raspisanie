@@ -18,11 +18,17 @@ class ScheduleService:
                 SELECT d.id, d.date, d.group_id, l.id as lesson_id, l.time, l.subject, l.type, l.classroom, l.teacher
                 FROM days d
                 LEFT JOIN lessons l ON l.day_id = d.id
-                WHERE d.group_id = :group_id AND d.date = :date
+                WHERE d.group_id = :group_id AND d.date LIKE :date
                 ORDER BY l.time ASC
                 """
             )
-            result = db.execute(query, {"group_id": group_id, "date": date})
+            # Преобразуем ISO YYYY-MM-DD в шаблон ДД.ММ.ГГГГ (часть строки)
+            try:
+                yyyy, mm, dd = date.split("-")
+                formatted_like = f"%{dd}.{mm}.{yyyy}%"
+            except Exception:
+                formatted_like = f"%{date}%"
+            result = db.execute(query, {"group_id": group_id, "date": formatted_like})
             schedule_data = result.fetchall()
             print("Данные расписания:", schedule_data)  # Отладка
 
@@ -77,11 +83,16 @@ class ScheduleService:
                 SELECT l.id, l.day_id, l.time, l.subject, l.type, l.classroom, l.teacher, d.date, d.group_id
                 FROM lessons l
                 JOIN days d ON l.day_id = d.id
-                WHERE l.teacher = :teacher_name AND d.date = :date
+                WHERE l.teacher = :teacher_name AND d.date LIKE :date
                 ORDER BY l.time ASC
                 """
             )
-            result = db.execute(query, {"teacher_name": teacher_name, "date": date})
+            try:
+                yyyy, mm, dd = date.split("-")
+                formatted_like = f"%{dd}.{mm}.{yyyy}%"
+            except Exception:
+                formatted_like = f"%{date}%"
+            result = db.execute(query, {"teacher_name": teacher_name, "date": formatted_like})
             lessons_data = result.fetchall()
             if lessons_data:
                 return {
