@@ -1,5 +1,5 @@
 import os
-os.environ['DATABASE_URL'] = 'sqlite:///./test.db'
+os.environ['DATABASE_URL'] = 'sqlite:////tmp/test_api.db'
 os.environ.setdefault('ALLOW_PUBLIC', 'true')
 os.environ.setdefault('RUN_BOT', 'false')
 
@@ -12,6 +12,11 @@ from app.services.schedule import ScheduleService
 
 def setup_module(module):
     # Prepare fresh test DB and seed minimal data
+    try:
+        if os.path.exists('/tmp/test_api.db'):
+            os.remove('/tmp/test_api.db')
+    except Exception:
+        pass
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
