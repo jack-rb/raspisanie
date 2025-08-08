@@ -13,19 +13,19 @@ class ScheduleService:
     def get_schedule_by_date(db: Session, group_id: int, date: str) -> Optional[Day]:
         try:
             # Прямой SQL запрос для получения дня и уроков
-            query = text("""
+            query = text(
+                """
                 SELECT d.id, d.date, d.group_id, l.id as lesson_id, l.time, l.subject, l.type, l.classroom, l.teacher
                 FROM days d
                 LEFT JOIN lessons l ON l.day_id = d.id
-                WHERE d.group_id = :group_id AND d.date LIKE :date
-            """)
-            
-            formatted_date = f"%{date.split('-')[2]}.{date.split('-')[1]}.{date.split('-')[0]}"
-            result = db.execute(query, {"group_id": group_id, "date": formatted_date})
-            
+                WHERE d.group_id = :group_id AND d.date = :date
+                ORDER BY l.time ASC
+                """
+            )
+            result = db.execute(query, {"group_id": group_id, "date": date})
             schedule_data = result.fetchall()
             print("Данные расписания:", schedule_data)  # Отладка
-            
+
             if schedule_data:
                 return {
                     "id": schedule_data[0][0],
@@ -41,7 +41,7 @@ class ScheduleService:
                             "classroom": row[7],
                             "teacher": row[8]
                         }
-                        for row in schedule_data if row[4] is not None
+                        for row in schedule_data if row[3] is not None
                     ]
                 }
             return None
@@ -72,15 +72,16 @@ class ScheduleService:
     def get_teacher_schedule_by_date(db: Session, teacher_name: str, date: str) -> Optional[dict]:
         try:
             # Прямой SQL запрос для получения уроков преподавателя на дату
-            query = text("""
+            query = text(
+                """
                 SELECT l.id, l.day_id, l.time, l.subject, l.type, l.classroom, l.teacher, d.date, d.group_id
                 FROM lessons l
                 JOIN days d ON l.day_id = d.id
-                WHERE l.teacher = :teacher_name AND d.date LIKE :date
+                WHERE l.teacher = :teacher_name AND d.date = :date
                 ORDER BY l.time ASC
-            """)
-            formatted_date = f"%{date.split('-')[2]}.{date.split('-')[1]}.{date.split('-')[0]}"
-            result = db.execute(query, {"teacher_name": teacher_name, "date": formatted_date})
+                """
+            )
+            result = db.execute(query, {"teacher_name": teacher_name, "date": date})
             lessons_data = result.fetchall()
             if lessons_data:
                 return {
