@@ -1,5 +1,5 @@
 import os
-os.environ.setdefault('DATABASE_URL', 'sqlite:///./test.db')
+os.environ['DATABASE_URL'] = 'sqlite:///./test.db'
 os.environ.setdefault('ALLOW_PUBLIC', 'true')
 os.environ.setdefault('RUN_BOT', 'false')
 
