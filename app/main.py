@@ -17,6 +17,12 @@ from .core.database import get_db
 from .services.schedule import ScheduleService
 from .schemas.schedule import Group, Day, Lesson, Teacher
 from .bot.bot import bot, setup_bot
+from .core.config import settings
+
+# Простой логгер
+import logging
+logger = logging.getLogger("app")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
 app = FastAPI(title="Schedule API")
 
@@ -59,7 +65,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # --- Проверка Init Data (перенесена выше, до использования в Depends) ---
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# Если включён публичный доступ, отключим жёсткую проверку
 def check_telegram_init_data(init_data: str) -> bool:
+    if settings.ALLOW_PUBLIC:
+        return True
     if not TELEGRAM_BOT_TOKEN:
         return False
     data = dict(parse_qsl(init_data, strict_parsing=True))
@@ -70,6 +79,8 @@ def check_telegram_init_data(init_data: str) -> bool:
     return hmac_string == hash_
 
 async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
+    if settings.ALLOW_PUBLIC:
+        return True
     init_data = None
     try:
         body = await request.json()

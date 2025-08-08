@@ -7,5 +7,7 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - ALLOW_PUBLIC=${ALLOW_PUBLIC:-true}
     volumes:
       - ./data:/app/data

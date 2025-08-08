@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from typing import List
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -8,7 +9,8 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     DOMAIN: str
     SUBDOMAIN_ENABLED: bool = True
-    
+    ALLOW_PUBLIC: bool = False  # Позволять доступ без Telegram InitData (для отладки/демо)
+
     class Config:
         env_file = ".env"
 

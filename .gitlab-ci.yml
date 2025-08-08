@@ -71,10 +71,13 @@ deploy:
       REDIS_PORT=${REDIS_PORT:-6379}
       REDIS_DB=${REDIS_DB:-0}
       SUBDOMAIN_ENABLED=${SUBDOMAIN_ENABLED:-true}
+      ALLOW_PUBLIC=${ALLOW_PUBLIC:-true}
       ENVFILE
 
       docker login ${CI_REGISTRY} -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
       cd /opt/schedule-bot
       docker compose pull
       docker compose up -d --remove-orphans
+      sleep 2
+      curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/ || true
       EOF 
