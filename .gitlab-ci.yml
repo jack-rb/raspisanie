@@ -1,3 +1,4 @@
+Set-Content -Path .gitlab-ci.yml -Value @'
 image: docker:24
 
 services:
@@ -21,7 +22,6 @@ build-image:
     - docker buildx create --use || true
     - docker buildx build --push -t "$CI_REGISTRY_IMAGE:latest" -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" .
 
-
 deploy:
   stage: deploy
   needs: ["build-image"]
@@ -36,10 +36,11 @@ deploy:
     - echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
   script:
     - |
-      ssh "$SSH_USER@$SSH_HOST" bash -se << EOF
+      ssh "$SSH_USER@$SSH_HOST" bash -se << 'EOF'
       set -e
       mkdir -p /opt/schedule-bot/data
-      # Создаём/обновляем docker-compose.yml на сервере
+
+      # docker-compose.yml
       cat > /opt/schedule-bot/docker-compose.yml << 'COMPOSE'
       version: '3.8'
       services:
@@ -53,7 +54,7 @@ deploy:
             - ./data:/app/data
       COMPOSE
 
-      # Создаём/обновляем .env на сервере (значения приходят из GitLab CI Variables)
+      # .env (из переменных GitLab)
       cat > /opt/schedule-bot/.env << ENVFILE
       COMPOSE_IMAGE=${CI_REGISTRY_IMAGE}:latest
       DATABASE_URL=${DATABASE_URL}
@@ -61,10 +62,13 @@ deploy:
       DOMAIN=${DOMAIN}
       REDIS_HOST=${REDIS_HOST:-redis}
       REDIS_PORT=${REDIS_PORT:-6379}
+      REDIS_DB=${REDIS_DB:-0}
+      SUBDOMAIN_ENABLED=${SUBDOMAIN_ENABLED:-true}
       ENVFILE
 
       docker login ${CI_REGISTRY} -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
       cd /opt/schedule-bot
       docker compose pull
       docker compose up -d --remove-orphans
-      EOF 
+      EOF
+'@ -Encoding UTF8
