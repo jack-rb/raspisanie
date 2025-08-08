@@ -1,0 +1,70 @@
+image: docker:24
+
+services:
+  - docker:24-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_DRIVER: overlay2
+
+stages:
+  - build
+  - deploy
+
+build-image:
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker buildx create --use || true
+    - docker buildx build --push -t "$CI_REGISTRY_IMAGE:latest" -t "$CI_REGISTRY_IMAGE:${CI_COMMIT_SHORT_SHA}" .
+
+
+deploy:
+  stage: deploy
+  needs: ["build-image"]
+  image: alpine:3.19
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $SSH_HOST && $SSH_USER && $SSH_PRIVATE_KEY'
+  before_script:
+    - apk add --no-cache openssh-client bash
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+  script:
+    - |
+      ssh "$SSH_USER@$SSH_HOST" bash -se << EOF
+      set -e
+      mkdir -p /opt/schedule-bot/data
+      # Создаём/обновляем docker-compose.yml на сервере
+      cat > /opt/schedule-bot/docker-compose.yml << 'COMPOSE'
+      version: '3.8'
+      services:
+        web:
+          image: ${COMPOSE_IMAGE}
+          restart: unless-stopped
+          env_file: .env
+          ports:
+            - "8000:8000"
+          volumes:
+            - ./data:/app/data
+      COMPOSE
+
+      # Создаём/обновляем .env на сервере (значения приходят из GitLab CI Variables)
+      cat > /opt/schedule-bot/.env << ENVFILE
+      COMPOSE_IMAGE=${CI_REGISTRY_IMAGE}:latest
+      DATABASE_URL=${DATABASE_URL}
+      BOT_TOKEN=${BOT_TOKEN}
+      DOMAIN=${DOMAIN}
+      REDIS_HOST=${REDIS_HOST:-redis}
+      REDIS_PORT=${REDIS_PORT:-6379}
+      ENVFILE
+
+      docker login ${CI_REGISTRY} -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
+      cd /opt/schedule-bot
+      docker compose pull
+      docker compose up -d --remove-orphans
+      EOF 
