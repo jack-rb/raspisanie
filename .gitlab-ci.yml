@@ -17,7 +17,9 @@ unit-tests:
   image: python:3.11-slim
   stage: test
   rules:
-    - if: '$CI_COMMIT_BRANCH'
+    - if: '$RUN_TESTS == "1"'
+      when: on_success
+    - when: never
   before_script:
     - pip install --no-cache-dir -r requirements.txt pytest httpx
   script:
