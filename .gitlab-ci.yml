@@ -48,12 +48,12 @@ deploy:
         docker compose version
       fi
 
-      # Создаём/обновляем docker-compose.yml на сервере
-      cat > /opt/schedule-bot/docker-compose.yml << 'COMPOSE'
+      # Создаём/обновляем docker-compose.yml на сервере (вставляем образ напрямую)
+      cat > /opt/schedule-bot/docker-compose.yml << COMPOSE
       version: '3.8'
       services:
         web:
-          image: ${COMPOSE_IMAGE}
+          image: ${CI_REGISTRY_IMAGE}:latest
           restart: unless-stopped
           env_file: .env
           ports:
@@ -64,7 +64,6 @@ deploy:
 
       # Создаём/обновляем .env на сервере (значения приходят из GitLab CI Variables)
       cat > /opt/schedule-bot/.env << ENVFILE
-      COMPOSE_IMAGE=${CI_REGISTRY_IMAGE}:latest
       DATABASE_URL=${DATABASE_URL}
       BOT_TOKEN=${BOT_TOKEN}
       DOMAIN=${DOMAIN}
