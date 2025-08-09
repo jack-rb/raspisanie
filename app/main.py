@@ -79,15 +79,15 @@ def _extract_init_data(request: Request, x_telegram_initdata: str | None) -> tup
     if init_data:
         return init_data, "body.initData"
 
-    # 2) header (наш)
-    if x_telegram_initdata:
-        return x_telegram_initdata, "hdr.X-Telegram-InitData"
-
-    # 3) официальные/альтернативные заголовки
+    # 2) официальные/альтернативные заголовки (ПРИОРИТЕТ)
     for h in ("telegram-init-data", "x-telegram-web-app-data", "x-init-data"):
         v = request.headers.get(h)
         if v:
             return v, f"hdr.{h}"
+
+    # 3) наш заголовок (Fallback)
+    if x_telegram_initdata:
+        return x_telegram_initdata, "hdr.X-Telegram-InitData"
 
     # 4) query
     for q in ("tgWebAppData", "init_data"):
