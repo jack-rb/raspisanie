@@ -234,6 +234,13 @@ async def set_user_selection(request: Request, db: Session = Depends(get_db)):
     )
     return {"ok": True}
 
+@app.get("/config-public")
+async def config_public():
+    return {
+        "bot_username": settings.BOT_USERNAME,
+        "domain": settings.DOMAIN
+    }
+
 # Запуск бота при старте приложения
 @app.on_event("startup")
 async def startup_event():

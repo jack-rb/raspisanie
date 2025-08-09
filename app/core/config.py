@@ -4,6 +4,7 @@ from typing import List
 class Settings(BaseSettings):
     DATABASE_URL: str
     BOT_TOKEN: str
+    BOT_USERNAME: str | None = None  # @username без @, например: www_test_www_bot
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0

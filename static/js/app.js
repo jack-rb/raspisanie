@@ -120,21 +120,37 @@ function displaySchedule(schedule, selectedDate) {
 }
 
 // Вспомогательная функция для fetch с initData
-function fetchWithInitData(url, options = {}) {
+async function fetchWithInitData(url, options = {}) {
     const tg = window.Telegram.WebApp;
     const initData = tg && tg.initData ? tg.initData : '';
-    // Если это GET-запрос, просто добавим initData в заголовок
     if (!options.method || options.method.toUpperCase() === 'GET') {
         options.headers = Object.assign({}, options.headers, { 'X-Telegram-InitData': initData });
-        return fetch(url, options);
+        const resp = await fetch(url, options);
+        if (resp.status === 401) await showOpenInTelegram();
+        return resp;
     } else {
-        // Для POST/PUT и т.д. — добавим initData в body
         let body = options.body ? JSON.parse(options.body) : {};
         body.initData = initData;
         options.body = JSON.stringify(body);
         options.headers = Object.assign({}, options.headers, { 'Content-Type': 'application/json' });
-        return fetch(url, options);
+        const resp = await fetch(url, options);
+        if (resp.status === 401) await showOpenInTelegram();
+        return resp;
     }
+}
+
+async function showOpenInTelegram() {
+    try {
+        const cfg = await fetch('/config-public').then(r => r.json());
+        const uname = cfg.bot_username;
+        if (!uname) return;
+        const container = document.getElementById('scheduleContainer');
+        container.innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'empty-schedule';
+        div.innerHTML = `Авторизация через Telegram не пройдена.<br/>Откройте мини‑приложение через бота:<br/><a href="https://t.me/${uname}?startapp=go" target="_blank">Открыть в Telegram</a>`;
+        container.appendChild(div);
+    } catch (e) {}
 }
 
 async function loadGroups(selectedId = null) {
