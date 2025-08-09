@@ -70,14 +70,21 @@ TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 def check_telegram_init_data(init_data: str) -> bool:
     if settings.ALLOW_PUBLIC:
         return True
-    if not TELEGRAM_BOT_TOKEN:
+    if not TELEGRAM_BOT_TOKEN or not init_data:
         return False
-    data = dict(parse_qsl(init_data, strict_parsing=True))
-    hash_ = data.pop('hash', None)
-    data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
-    secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
-    hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return hmac_string == hash_
+    try:
+        data = dict(parse_qsl(init_data, strict_parsing=True))
+        hash_ = data.pop('hash', None)
+        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+        secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
+        hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        ok = (hmac_string == hash_)
+        if not ok:
+            logger.warning("InitData HMAC mismatch")
+        return ok
+    except Exception as e:
+        logger.warning(f"InitData parse error: {e}")
+        return False
 
 async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
     if settings.ALLOW_PUBLIC:
@@ -91,6 +98,7 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
     if not init_data:
         init_data = x_telegram_initdata
     if not init_data or not check_telegram_init_data(init_data):
+        logger.info("Auth failed for request %s %s", request.method, request.url.path)
         raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
     return True
 # --- Конец блока проверки Init Data ---
