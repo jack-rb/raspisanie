@@ -21,6 +21,9 @@ from .bot.bot import bot, setup_bot
 from .core.config import settings
 from .services.schedule import AuthHelpers
 
+from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
+from uuid import uuid4
+
 # Простой логгер
 import logging
 logger = logging.getLogger("app")
@@ -66,6 +69,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- Проверка Init Data (перенесена выше, до использования в Depends) ---
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+if TELEGRAM_BOT_TOKEN:
+    TELEGRAM_BOT_TOKEN = TELEGRAM_BOT_TOKEN.strip()
 
 # Если включён публичный доступ, отключим жёсткую проверку
 def _extract_init_data(request: Request, x_telegram_initdata: str | None) -> tuple[str | None, str]:
@@ -105,8 +110,10 @@ def check_telegram_init_data(init_data: str, src: str) -> bool:
         logger.warning("InitData empty or no BOT_TOKEN (src=%s)", src)
         return False
     try:
-        # Tolerant parsing: trim and keep blank values
+        # Normalize init_data
         init_data = init_data.strip()
+        if len(init_data) >= 2 and ((init_data[0] == '"' and init_data[-1] == '"') or (init_data[0] == "'" and init_data[-1] == "'")):
+            init_data = init_data[1:-1]
         data = dict(parse_qsl(
             init_data,
             keep_blank_values=True,
@@ -278,6 +285,31 @@ async def config_public():
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN
     }
+
+@app.post("/webapp/submit")
+@limiter.limit("5/second;100/hour")
+async def webapp_submit(request: Request):
+    body = await request.json()
+    query_id = body.get("query_id")
+    init_data = body.get("initData") or request.headers.get("telegram-init-data") or request.headers.get("x-telegram-web-app-data")
+    if not query_id:
+        raise HTTPException(status_code=400, detail="query_id required")
+    if not settings.ALLOW_PUBLIC and (not init_data or not check_telegram_init_data(init_data, "submit.body")):
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+    # Build result
+    payload = body.get("data")
+    text = f"Данные получены: {payload}" if payload is not None else "Данные получены"
+    result = InlineQueryResultArticle(
+        id=str(uuid4()),
+        title="Отправлено",
+        input_message_content=InputTextMessageContent(text)
+    )
+    try:
+        await bot.answer_web_app_query(query_id, result)
+    except Exception as e:
+        logger.warning(f"answer_web_app_query error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to answer web app query")
+    return {"ok": True}
 
 # Запуск бота при старте приложения
 @app.on_event("startup")
