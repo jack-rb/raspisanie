@@ -68,48 +68,78 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Если включён публичный доступ, отключим жёсткую проверку
-def check_telegram_init_data(init_data: str) -> bool:
+def _extract_init_data(request: Request, x_telegram_initdata: str | None) -> tuple[str | None, str]:
+    # 1) body (POST)
+    init_data = None
+    try:
+        # тело уже будет прочитано в verify, здесь только fallback
+        pass
+    except Exception:
+        pass
+    if init_data:
+        return init_data, "body.initData"
+
+    # 2) header (наш)
+    if x_telegram_initdata:
+        return x_telegram_initdata, "hdr.X-Telegram-InitData"
+
+    # 3) официальные/альтернативные заголовки
+    for h in ("telegram-init-data", "x-telegram-web-app-data", "x-init-data"):
+        v = request.headers.get(h)
+        if v:
+            return v, f"hdr.{h}"
+
+    # 4) query
+    for q in ("tgWebAppData", "init_data"):
+        v = request.query_params.get(q)
+        if v:
+            return v, f"qry.{q}"
+
+    return None, "none"
+
+
+def check_telegram_init_data(init_data: str, src: str) -> bool:
     if settings.ALLOW_PUBLIC:
         return True
     if not TELEGRAM_BOT_TOKEN or not init_data:
+        logger.warning("InitData empty or no BOT_TOKEN (src=%s)", src)
         return False
     try:
         data = dict(parse_qsl(init_data, strict_parsing=True))
-        hash_ = data.pop('hash', None)
+        recv_hash = data.pop('hash', None) or ""
         data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
         secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
-        hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        ok = _hmaclib.compare_digest(hmac_string, hash_) if hash_ else False
+        local_hmac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        ok = _hmaclib.compare_digest(local_hmac, recv_hash)
         if not ok:
-            logger.warning("InitData HMAC mismatch")
+            logger.warning(
+                "InitData HMAC mismatch (src=%s, len=%s, recv=%s..., calc=%s...)",
+                src, len(init_data), recv_hash[:8], local_hmac[:8]
+            )
         return ok
     except Exception as e:
-        logger.warning(f"InitData parse error: {e}")
+        logger.warning("InitData parse error (src=%s): %s", src, e)
         return False
 
 async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
     if settings.ALLOW_PUBLIC:
         return True
-    init_data = None
+    # 1) читаем тело для POST
+    init_data_body = None
     try:
         body = await request.json()
-        init_data = body.get("initData") or body.get("init_data")
+        if isinstance(body, dict):
+            init_data_body = body.get("initData") or body.get("init_data")
     except Exception:
-        pass  # body может отсутствовать для GET
-    if not init_data:
-        # custom header by our frontend
-        init_data = x_telegram_initdata
-    if not init_data:
-        # official Telegram header
-        init_data = request.headers.get("telegram-init-data")
-    if not init_data:
-        # alternate header name (fallback)
-        init_data = request.headers.get("x-init-data") or request.headers.get("x-telegram-web-app-data")
-    if not init_data:
-        # query param fallback used by some clients
-        init_data = request.query_params.get("tgWebAppData") or request.query_params.get("init_data")
-    if not init_data or not check_telegram_init_data(init_data):
-        logger.info("Auth failed for request %s %s", request.method, request.url.path)
+        pass
+
+    if init_data_body:
+        init_data, src = init_data_body, "body.initData"
+    else:
+        init_data, src = _extract_init_data(request, x_telegram_initdata)
+
+    if not init_data or not check_telegram_init_data(init_data, src):
+        logger.info("Auth failed %s %s (src=%s)", request.method, request.url.path, src)
         raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
     return True
 # --- Конец блока проверки Init Data ---
