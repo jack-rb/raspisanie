@@ -14,6 +14,7 @@ def setup_bot():
 # Запуск polling через executor (блокирующий) — вызывать в отдельном потоке
 from aiogram.utils import executor
 import logging
+import asyncio
 
 
 def run_bot():
@@ -26,4 +27,7 @@ def run_bot():
         except Exception as e:
             logging.getLogger("bot").warning(f"Webhook delete error: {e}")
 
+    # Создаём и привязываем event loop к потоку перед стартом polling
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
