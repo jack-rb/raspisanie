@@ -409,5 +409,5 @@ document.getElementById('teachersBtn').addEventListener('click', () => setMode('
     initDatePicker();
     await loadLastSelection();
     await showUserInfo();
-})(); 
+})();
 });

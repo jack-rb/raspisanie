@@ -2,7 +2,6 @@ import asyncio
 from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -13,6 +12,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import hmac as _hmaclib
+from fastapi.middleware.cors import CORSMiddleware
 
 from .core.database import get_db
 from .services.schedule import ScheduleService
@@ -42,7 +42,6 @@ app.add_middleware(
 
 # --- SlowAPI Limiter ---
 # Кастомная функция для извлечения user_id из Init Data
-
 
 def get_user_id_from_init_data(request: Request):
     try:

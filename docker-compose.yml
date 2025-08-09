@@ -10,4 +10,4 @@ services:
     environment:
       - ALLOW_PUBLIC=${ALLOW_PUBLIC:-true}
     volumes:
-      - ./data:/app/data
+      - ./schedule.db:/app/schedule.db 
