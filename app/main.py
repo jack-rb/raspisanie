@@ -43,22 +43,33 @@ app.add_middleware(
 # --- SlowAPI Limiter ---
 # Кастомная функция для извлечения user_id из Init Data
 
+
 def get_user_id_from_init_data(request: Request):
-    init_data = None
     try:
-        body = request._body if hasattr(request, '_body') else None
-        if not body:
-            body = request.json()
-        if isinstance(body, dict):
-            init_data = body.get("initData") or body.get("init_data")
+        # Читаем из заголовков (без попытки читать тело у async запроса)
+        for h in ("telegram-init-data", "x-telegram-web-app-data", "x-init-data", "x-telegram-initdata"):
+            v = request.headers.get(h)
+            if not v:
+                continue
+            try:
+                from urllib.parse import parse_qsl
+                import json
+                data = dict(parse_qsl(v, keep_blank_values=True, strict_parsing=False, encoding='utf-8', errors='ignore'))
+                if 'user' in data:
+                    u = json.loads(data['user'])
+                    uid = u.get('id')
+                    if uid is not None:
+                        return str(uid)
+            except Exception:
+                continue
     except Exception:
         pass
-    if not init_data:
-        init_data = request.headers.get("x-telegram-initdata")
-    if init_data:
-        data = dict(parse_qsl(init_data, strict_parsing=True))
-        return str(data.get("user\_id", "anonymous"))
-    return "anonymous"
+    # Фоллбек: IP-адрес
+    try:
+        from slowapi.util import get_remote_address
+        return get_remote_address(request) or "anonymous"
+    except Exception:
+        return "anonymous"
 
 limiter = Limiter(key_func=get_user_id_from_init_data)
 app.state.limiter = limiter
@@ -122,13 +133,8 @@ def check_telegram_init_data(init_data: str, src: str) -> bool:
             errors='ignore'
         ))
         recv_hash = data.pop('hash', None) or ""
-        # Use only official keys per Telegram docs
-        allowed_keys = {
-            'auth_date', 'query_id', 'user', 'receiver',
-            'chat_instance', 'chat_type', 'start_param', 'can_send_after'
-        }
-        filtered = {k: v for k, v in data.items() if k in allowed_keys}
-        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(filtered.items()))
+        # Формируем строку проверки ИЗ ВСЕХ полученных полей (кроме hash), как в доках Telegram
+        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
         secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
         local_hmac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         ok = _hmaclib.compare_digest(local_hmac, recv_hash)
