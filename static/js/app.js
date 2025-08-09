@@ -400,8 +400,14 @@ document.getElementById('confirmDate').addEventListener('click', () => {
     document.getElementById('datePickerModal').style.display = 'none';
 });
 
-document.getElementById('groupsBtn').addEventListener('click', () => setMode('groups'));
-document.getElementById('teachersBtn').addEventListener('click', () => setMode('teachers'));
+document.getElementById('groupsBtn').addEventListener('click', (e) => { e.preventDefault?.(); e.stopPropagation?.(); setMode('groups'); });
+document.getElementById('teachersBtn').addEventListener('click', (e) => { e.preventDefault?.(); e.stopPropagation?.(); setMode('teachers'); });
+
+// Fallback for Telegram Desktop: also bind mousedown
+['mousedown', 'touchstart'].forEach(evt => {
+    document.getElementById('groupsBtn').addEventListener(evt, (e) => { e.stopPropagation?.(); });
+    document.getElementById('teachersBtn').addEventListener(evt, (e) => { e.stopPropagation?.(); });
+});
 
 // Инициализация
 (async function initApp(){
