@@ -74,13 +74,13 @@ body {
 
 .nav-button {
     flex: 1;
-    padding: 10px; /* +2 */
+    padding: 8px; /* reduced */
     border: none;
-    border-radius: 10px; /* +2 */
+    border-radius: 8px; /* reduced */
     background-color: var(--tg-theme-button-color);
     color: var(--tg-theme-button-text-color);
     cursor: pointer;
-    font-size: 16px; /* + */
+    font-size: 14px; /* slightly smaller to offset base font increase */
 }
 
 .empty-schedule {
@@ -147,27 +147,28 @@ body {
 }
 
 .wheel-label {
-    font-size: 14px;
+    font-size: 15px; /* was 14px */
+    font-weight: 600;
     color: var(--tg-theme-hint-color);
 }
 
 .wheel {
     flex: 1;
-    height: 48px; /* + */
+    height: 56px; /* was 48px */
     margin: 0 5px;
-    border: 1px solid #ddd; /* выделим */
+    border: 1px solid #ddd;
     background-color: var(--tg-theme-bg-color);
     color: var(--tg-theme-text-color);
-    font-size: 16px;
+    font-size: 18px; /* was 16px */
     text-align: center;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url('data:image/svg+xml;utf8,<svg fill="%232678b6" height="16" viewBox="0 0 24 24" width="16" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%232678b6" height="18" viewBox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
     background-repeat: no-repeat;
     background-position: right 12px center;
-    background-size: 20px 20px;
-    padding-right: 32px;
+    background-size: 22px 22px;
+    padding-right: 36px; /* was 32px */
 }
 
 .picker-buttons {
@@ -178,10 +179,10 @@ body {
 
 .modal-button {
     flex: 1;
-    padding: 12px;
+    padding: 14px; /* was 12px */
     border: none;
-    border-radius: 10px; /* + */
-    font-size: 16px;
+    border-radius: 10px;
+    font-size: 18px; /* was 16px */
     cursor: pointer;
     background-color: var(--tg-theme-button-color);
     color: var(--tg-theme-button-text-color);
@@ -229,8 +230,8 @@ body {
         gap: 4px;
     }
     .wheel {
-        height: 40px;
-        font-size: 14px;
+        height: 46px; /* was 40px */
+        font-size: 16px; /* was 14px */
         margin: 0 2px;
         min-width: 0;
         padding: 6px 24px 6px 6px;
@@ -239,8 +240,8 @@ body {
         gap: 4px;
     }
     .modal-button {
-        padding: 8px;
-        font-size: 14px;
+        padding: 10px; /* was 8px */
+        font-size: 16px; /* was 14px */
     }
 }
 
@@ -250,12 +251,12 @@ body {
         padding: 4px;
     }
     .wheel {
-        font-size: 12px;
-        height: 32px;
+        font-size: 14px; /* was 12px */
+        height: 40px; /* was 32px */
         padding: 4px 18px 4px 4px;
     }
     .modal-button {
-        font-size: 12px;
-        padding: 6px;
+        font-size: 14px; /* was 12px */
+        padding: 8px; /* was 6px */
     }
 } 
