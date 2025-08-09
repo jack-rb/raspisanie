@@ -122,7 +122,13 @@ def check_telegram_init_data(init_data: str, src: str) -> bool:
             errors='ignore'
         ))
         recv_hash = data.pop('hash', None) or ""
-        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+        # Use only official keys per Telegram docs
+        allowed_keys = {
+            'auth_date', 'query_id', 'user', 'receiver',
+            'chat_instance', 'chat_type', 'start_param', 'can_send_after'
+        }
+        filtered = {k: v for k, v in data.items() if k in allowed_keys}
+        data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(filtered.items()))
         secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
         local_hmac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         ok = _hmaclib.compare_digest(local_hmac, recv_hash)
