@@ -233,13 +233,15 @@ async def set_user_selection(request: Request, db: Session = Depends(get_db)):
 # Запуск бота при старте приложения
 @app.on_event("startup")
 async def startup_event():
-    # Запуск бота по флагу окружения (чтобы не мешал тестам/локальному запуску)
-    if os.getenv("RUN_BOT", "false").lower() == "true":
-        dp = setup_bot()
-        asyncio.create_task(dp.start_polling(bot))
+    # Запускаем бота в отдельном потоке через executor, чтобы /start работал
+    import threading
+    from .bot.bot import run_bot
+    threading.Thread(target=run_bot, daemon=True).start()
 
 # Закрытие сессии бота при остановке приложения
 @app.on_event("shutdown")
 async def shutdown_event():
-    if os.getenv("RUN_BOT", "false").lower() == "true":
-        await bot.session.close() 
+    try:
+        await bot.session.close()
+    except Exception:
+        pass 
