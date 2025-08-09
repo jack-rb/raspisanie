@@ -9,9 +9,43 @@ from ..core.config import settings
 
 class AuthHelpers:
     @staticmethod
+    def _parse_user_payload(init_data: str) -> dict | None:
+        try:
+            data = dict(parse_qsl(
+                init_data,
+                keep_blank_values=True,
+                strict_parsing=False,
+                encoding='utf-8',
+                errors='ignore'
+            ))
+            # try parse user json
+            user = data.get('user')
+            if user:
+                import json
+                u = json.loads(user)
+                return {
+                    "user_id": int(u.get('id')) if u.get('id') is not None else None,
+                    "username": u.get('username'),
+                    "first_name": u.get('first_name'),
+                    "last_name": u.get('last_name'),
+                    "language_code": u.get('language_code')
+                }
+            if 'user_id' in data:
+                return {"user_id": int(data['user_id'])}
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
     def verify_init_data(init_data: str) -> dict | None:
+        # В публичном режиме не проверяем HMAC, но пытаемся извлечь реальные данные пользователя
         if settings.ALLOW_PUBLIC:
-            return {"user_id": "public"}
+            if not init_data:
+                return {"user_id": "public"}
+            payload = AuthHelpers._parse_user_payload(init_data)
+            return payload or {"user_id": "public"}
+
+        # Строгая проверка в обычном режиме
         if not init_data or not settings.BOT_TOKEN:
             return None
         data = dict(parse_qsl(init_data, strict_parsing=True))
