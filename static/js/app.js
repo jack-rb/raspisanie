@@ -123,8 +123,13 @@ function displaySchedule(schedule, selectedDate) {
 async function fetchWithInitData(url, options = {}) {
     const tg = window.Telegram.WebApp;
     const initData = tg && tg.initData ? tg.initData : '';
+    const commonHeaders = {
+        'X-Telegram-InitData': initData,
+        'Telegram-Init-Data': initData,
+        'X-Telegram-Web-App-Data': initData
+    };
     if (!options.method || options.method.toUpperCase() === 'GET') {
-        options.headers = Object.assign({}, options.headers, { 'X-Telegram-InitData': initData });
+        options.headers = Object.assign({}, options.headers || {}, commonHeaders);
         const resp = await fetch(url, options);
         if (resp.status === 401) await showOpenInTelegram();
         return resp;
@@ -132,7 +137,7 @@ async function fetchWithInitData(url, options = {}) {
         let body = options.body ? JSON.parse(options.body) : {};
         body.initData = initData;
         options.body = JSON.stringify(body);
-        options.headers = Object.assign({}, options.headers, { 'Content-Type': 'application/json' });
+        options.headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' }, commonHeaders);
         const resp = await fetch(url, options);
         if (resp.status === 401) await showOpenInTelegram();
         return resp;
