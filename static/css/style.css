@@ -217,6 +217,13 @@ body {
     display: block;
 }
 
+.user-info {
+    text-align: center;
+    font-size: 14px;
+    color: var(--tg-theme-hint-color);
+    margin: -6px 0 12px 0;
+}
+
 @media (max-width: 600px) {
     .modal-content {
         padding: 8px;

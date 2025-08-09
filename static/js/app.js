@@ -292,6 +292,20 @@ async function loadSchedule() {
     }
 }
 
+async function showUserInfo() {
+    const el = document.getElementById('userInfo');
+    try {
+        const resp = await fetchWithInitData('/whoami');
+        if (!resp.ok) throw new Error('unauth');
+        const data = await resp.json();
+        const uid = data.user_id || '—';
+        const uname = data.username ? '@'+data.username : '';
+        el.textContent = `Ваш ID: ${uid} ${uname}`;
+    } catch (e) {
+        el.innerHTML = 'Откройте через бота, чтобы авторизоваться';
+    }
+}
+
 function initDatePicker() {
     const dayWheel = document.getElementById('dayWheel');
     const monthWheel = document.getElementById('monthWheel');
@@ -394,5 +408,6 @@ document.getElementById('teachersBtn').addEventListener('click', () => setMode('
     await loadGroups();
     initDatePicker();
     await loadLastSelection();
+    await showUserInfo();
 })(); 
 });
