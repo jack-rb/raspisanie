@@ -105,7 +105,15 @@ def check_telegram_init_data(init_data: str, src: str) -> bool:
         logger.warning("InitData empty or no BOT_TOKEN (src=%s)", src)
         return False
     try:
-        data = dict(parse_qsl(init_data, strict_parsing=True))
+        # Tolerant parsing: trim and keep blank values
+        init_data = init_data.strip()
+        data = dict(parse_qsl(
+            init_data,
+            keep_blank_values=True,
+            strict_parsing=False,
+            encoding='utf-8',
+            errors='ignore'
+        ))
         recv_hash = data.pop('hash', None) or ""
         data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
         secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
