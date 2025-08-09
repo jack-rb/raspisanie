@@ -12,6 +12,7 @@ from urllib.parse import parse_qsl
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import hmac as _hmaclib
 
 from .core.database import get_db
 from .services.schedule import ScheduleService
@@ -78,7 +79,7 @@ def check_telegram_init_data(init_data: str) -> bool:
         data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
         secret_key = hashlib.sha256(TELEGRAM_BOT_TOKEN.encode()).digest()
         hmac_string = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        ok = (hmac_string == hash_)
+        ok = _hmaclib.compare_digest(hmac_string, hash_) if hash_ else False
         if not ok:
             logger.warning("InitData HMAC mismatch")
         return ok
@@ -96,11 +97,14 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
     except Exception:
         pass  # body может отсутствовать для GET
     if not init_data:
-        # primary custom header
+        # custom header by our frontend
         init_data = x_telegram_initdata
     if not init_data:
+        # official Telegram header
+        init_data = request.headers.get("telegram-init-data")
+    if not init_data:
         # alternate header name (fallback)
-        init_data = request.headers.get("x-init-data")
+        init_data = request.headers.get("x-init-data") or request.headers.get("x-telegram-web-app-data")
     if not init_data:
         # query param fallback used by some clients
         init_data = request.query_params.get("tgWebAppData") or request.query_params.get("init_data")
