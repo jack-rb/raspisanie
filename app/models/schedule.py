@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, DateTime, BigInteger
 from sqlalchemy.orm import relationship
 from ..core.database import Base
+from datetime import datetime
 
 class Group(Base):
     __tablename__ = "groups"
@@ -29,3 +30,17 @@ class Lesson(Base):
     classroom = Column(String)
     teacher = Column(String)
     day = relationship("Day", back_populates="lessons")
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tg_user_id = Column(BigInteger, unique=True, index=True, nullable=False)
+    username = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    language_code = Column(String, nullable=True)
+    last_seen_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_selected_group_id = Column(Integer, nullable=True)
+    last_selected_teacher = Column(String, nullable=True)

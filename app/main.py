@@ -18,6 +18,7 @@ from .services.schedule import ScheduleService
 from .schemas.schedule import Group, Day, Lesson, Teacher
 from .bot.bot import bot, setup_bot
 from .core.config import settings
+from .services.schedule import AuthHelpers
 
 # Простой логгер
 import logging
@@ -165,6 +166,54 @@ async def secure_endpoint(
 ):
     # Ваш код для защищённого эндпоинта
     return {"status": "ok"}
+
+@app.get("/whoami")
+async def whoami(request: Request, db: Session = Depends(get_db)):
+    # возвращает данные пользователя из initData (без сохранения)
+    init_data = request.headers.get("x-telegram-initdata")
+    payload = AuthHelpers.verify_init_data(init_data)
+    if not payload:
+        if settings.ALLOW_PUBLIC:
+            return {"user_id": "public"}
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+    return payload
+
+@app.get("/user/selection")
+async def get_user_selection(request: Request, db: Session = Depends(get_db)):
+    init_data = request.headers.get("x-telegram-initdata")
+    payload = AuthHelpers.verify_init_data(init_data)
+    if not payload:
+        if settings.ALLOW_PUBLIC:
+            return {"last_selected_group_id": None, "last_selected_teacher": None}
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+    AuthHelpers.upsert_user(db, payload)
+    from .models.schedule import User
+    user = db.query(User).filter(User.tg_user_id == payload.get('user_id')).first()
+    if not user:
+        return {"last_selected_group_id": None, "last_selected_teacher": None}
+    return {
+        "last_selected_group_id": user.last_selected_group_id,
+        "last_selected_teacher": user.last_selected_teacher,
+    }
+
+@app.post("/user/selection")
+async def set_user_selection(request: Request, db: Session = Depends(get_db)):
+    body = await request.json()
+    init_data = body.get("initData") or request.headers.get("x-telegram-initdata")
+    payload = AuthHelpers.verify_init_data(init_data)
+    if not payload:
+        if not settings.ALLOW_PUBLIC:
+            raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+        # В публичном режиме сохранять нечего
+        return {"ok": True}
+    AuthHelpers.upsert_user(db, payload)
+    AuthHelpers.save_last_selection(
+        db,
+        user_id=payload.get('user_id'),
+        group_id=body.get('group_id'),
+        teacher=body.get('teacher'),
+    )
+    return {"ok": True}
 
 # Запуск бота при старте приложения
 @app.on_event("startup")

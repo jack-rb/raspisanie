@@ -1,8 +1,79 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
-from ..models.schedule import Group, Day, Lesson
+from ..models.schedule import Group, Day, Lesson, User
 from sqlalchemy import text
+import hashlib, hmac
+from urllib.parse import parse_qsl
+from ..core.config import settings
+
+class AuthHelpers:
+    @staticmethod
+    def verify_init_data(init_data: str) -> dict | None:
+        if settings.ALLOW_PUBLIC:
+            return {"user_id": "public"}
+        if not init_data or not settings.BOT_TOKEN:
+            return None
+        data = dict(parse_qsl(init_data, strict_parsing=True))
+        hash_ = data.pop('hash', None)
+        dcs = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+        secret = hashlib.sha256(settings.BOT_TOKEN.encode()).digest()
+        check = hmac.new(secret, dcs.encode(), hashlib.sha256).hexdigest()
+        if check != hash_:
+            return None
+        # try parse user json
+        user = data.get('user')
+        try:
+            import json
+            if user:
+                u = json.loads(user)
+                return {
+                    "user_id": int(u.get('id')),
+                    "username": u.get('username'),
+                    "first_name": u.get('first_name'),
+                    "last_name": u.get('last_name'),
+                    "language_code": u.get('language_code')
+                }
+        except Exception:
+            pass
+        if 'user_id' in data:
+            return {"user_id": int(data['user_id'])}
+        return None
+
+    @staticmethod
+    def upsert_user(db: Session, payload: dict) -> User | None:
+        try:
+            uid = payload.get('user_id')
+            if not uid or uid == 'public':
+                return None
+            user = db.query(User).filter(User.tg_user_id == uid).first()
+            if not user:
+                user = User(tg_user_id=uid)
+                db.add(user)
+            user.username = payload.get('username', user.username)
+            user.first_name = payload.get('first_name', user.first_name)
+            user.last_name = payload.get('last_name', user.last_name)
+            user.language_code = payload.get('language_code', user.language_code)
+            from datetime import datetime
+            user.last_seen_at = datetime.utcnow()
+            db.commit()
+            db.refresh(user)
+            return user
+        except Exception as e:
+            print("upsert user error", e)
+            db.rollback()
+            return None
+
+    @staticmethod
+    def save_last_selection(db: Session, user_id: int, group_id: int | None = None, teacher: str | None = None):
+        user = db.query(User).filter(User.tg_user_id == user_id).first()
+        if not user:
+            return
+        if group_id is not None:
+            user.last_selected_group_id = group_id
+        if teacher is not None:
+            user.last_selected_teacher = teacher
+        db.commit()
 
 class ScheduleService:
     @staticmethod

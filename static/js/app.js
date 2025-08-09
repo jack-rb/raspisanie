@@ -189,6 +189,38 @@ async function loadTeachers(selectedName = null) {
     }
 }
 
+async function loadLastSelection() {
+    try {
+        const resp = await fetchWithInitData('/user/selection');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.last_selected_group_id) {
+            selectedGroupId = String(data.last_selected_group_id);
+            currentMode = 'groups';
+            document.getElementById('groupsBtn').classList.add('active');
+            document.getElementById('teachersBtn').classList.remove('active');
+            await loadGroups(selectedGroupId);
+            await loadSchedule();
+        } else if (data.last_selected_teacher) {
+            selectedTeacherName = data.last_selected_teacher;
+            currentMode = 'teachers';
+            document.getElementById('teachersBtn').classList.add('active');
+            document.getElementById('groupsBtn').classList.remove('active');
+            await loadTeachers(selectedTeacherName);
+            await loadSchedule();
+        }
+    } catch (e) {}
+}
+
+async function saveLastSelection() {
+    try {
+        const body = {};
+        if (selectedGroupId) body.group_id = Number(selectedGroupId);
+        if (selectedTeacherName) body.teacher = selectedTeacherName;
+        await fetchWithInitData('/user/selection', { method: 'POST', body: JSON.stringify(body) });
+    } catch (e) {}
+}
+
 function setMode(mode) {
     currentMode = mode;
     const groupsBtn = document.getElementById('groupsBtn');
@@ -275,7 +307,7 @@ function initDatePicker() {
 }
 
 // Event Listeners
-document.getElementById('groupSelect').addEventListener('change', (e) => {
+document.getElementById('groupSelect').addEventListener('change', async (e) => {
     if (currentMode === 'groups') {
         selectedGroupId = e.target.value;
         selectedTeacherName = null;
@@ -284,6 +316,7 @@ document.getElementById('groupSelect').addEventListener('change', (e) => {
         selectedGroupId = null;
     }
     if (selectedGroupId || selectedTeacherName) {
+        await saveLastSelection();
         loadSchedule();
     }
 });
@@ -334,8 +367,10 @@ document.getElementById('groupsBtn').addEventListener('click', () => setMode('gr
 document.getElementById('teachersBtn').addEventListener('click', () => setMode('teachers'));
 
 // Инициализация
-tg.ready();
-updateTodayDate();
-loadGroups();
-initDatePicker(); 
-}); 
+(async function initApp(){
+    tg.ready();
+    updateTodayDate();
+    await loadGroups();
+    initDatePicker();
+    await loadLastSelection();
+})(); 
