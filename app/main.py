@@ -238,15 +238,41 @@ async def secure_endpoint(
     return {"status": "ok"}
 
 @app.get("/whoami")
-async def whoami(request: Request, db: Session = Depends(get_db)):
-    # возвращает данные пользователя из initData (без сохранения)
-    init_data = request.headers.get("x-telegram-initdata")
-    payload = AuthHelpers.verify_init_data(init_data)
-    if not payload:
-        if settings.ALLOW_PUBLIC:
-            return {"user_id": "public"}
+async def whoami(request: Request, x_telegram_initdata: str = Header(None)):
+    # extract initData using the same extraction helper
+    # read body once
+    init_data_body = None
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            init_data_body = body.get("initData") or body.get("init_data")
+    except Exception:
+        pass
+    if init_data_body:
+        init_data, src = init_data_body, "body.initData"
+    else:
+        init_data, src = _extract_init_data(request, x_telegram_initdata)
+    if not settings.ALLOW_PUBLIC and (not init_data or not check_telegram_init_data(init_data, src)):
         raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
-    return payload
+    # parse minimal user
+    info = {"source": src}
+    try:
+        init_data = (init_data or "").strip()
+        if len(init_data) >= 2 and ((init_data[0] == '"' and init_data[-1] == '"') or (init_data[0] == "'" and init_data[-1] == "'")):
+            init_data = init_data[1:-1]
+        data = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=False, encoding='utf-8', errors='ignore'))
+        import json
+        if 'user' in data:
+            u = json.loads(data['user'])
+            info.update({
+                "user_id": u.get('id'),
+                "username": u.get('username'),
+                "first_name": u.get('first_name'),
+                "last_name": u.get('last_name')
+            })
+    except Exception:
+        pass
+    return info
 
 @app.get("/user/selection")
 async def get_user_selection(request: Request, db: Session = Depends(get_db)):
