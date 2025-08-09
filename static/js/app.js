@@ -65,11 +65,11 @@ function displaySchedule(schedule, selectedDate) {
                 let detailsHtml = `${lesson.type}<br>Аудитория: ${lesson.classroom}<br>`;
                 if (currentMode === 'groups') {
                     // Преподаватель кликабелен
-                    detailsHtml += `Преподаватель: <a href="#" class="teacher-link" data-teacher="${encodeURIComponent(lesson.teacher)}">${lesson.teacher}</a>`;
+                    detailsHtml += `Преподаватель: <span class="teacher-link" data-teacher="${encodeURIComponent(lesson.teacher)}">${lesson.teacher}</span>`;
                 } else if (currentMode === 'teachers') {
                     // Группа кликабельна (если есть)
                     if (lesson.group_id && groupMap[lesson.group_id]) {
-                        detailsHtml += `Группа: <a href="#" class="group-link" data-group="${lesson.group_id}">${groupMap[lesson.group_id]}</a><br>`;
+                        detailsHtml += `Группа: <span class="group-link" data-group="${lesson.group_id}">${groupMap[lesson.group_id]}</span><br>`;
                     }
                     detailsHtml += `Преподаватель: ${lesson.teacher}`;
                 } else {
@@ -85,7 +85,8 @@ function displaySchedule(schedule, selectedDate) {
         // Добавляем обработчики клика по преподавателю
         container.querySelectorAll('.teacher-link').forEach(link => {
             link.addEventListener('click', function(e) {
-                e.preventDefault();
+                e.preventDefault?.();
+                e.stopPropagation?.();
                 const teacher = decodeURIComponent(this.getAttribute('data-teacher'));
                 if (teacher) {
                     selectedTeacherName = teacher;
@@ -101,7 +102,8 @@ function displaySchedule(schedule, selectedDate) {
         // Добавляем обработчики клика по группе
         container.querySelectorAll('.group-link').forEach(link => {
             link.addEventListener('click', function(e) {
-                e.preventDefault();
+                e.preventDefault?.();
+                e.stopPropagation?.();
                 const groupId = this.getAttribute('data-group');
                 if (groupId) {
                     selectedGroupId = groupId;

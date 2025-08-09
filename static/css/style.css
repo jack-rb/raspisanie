@@ -224,6 +224,12 @@ body {
     margin: -6px 0 12px 0;
 }
 
+.teacher-link, .group-link {
+    cursor: pointer;
+    text-decoration: underline;
+    color: var(--tg-theme-link-color);
+}
+
 @media (max-width: 600px) {
     .modal-content {
         padding: 8px;
