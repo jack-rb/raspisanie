@@ -96,7 +96,14 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
     except Exception:
         pass  # body может отсутствовать для GET
     if not init_data:
+        # primary custom header
         init_data = x_telegram_initdata
+    if not init_data:
+        # alternate header name (fallback)
+        init_data = request.headers.get("x-init-data")
+    if not init_data:
+        # query param fallback used by some clients
+        init_data = request.query_params.get("tgWebAppData") or request.query_params.get("init_data")
     if not init_data or not check_telegram_init_data(init_data):
         logger.info("Auth failed for request %s %s", request.method, request.url.path)
         raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
