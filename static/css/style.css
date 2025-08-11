@@ -1,3 +1,28 @@
+/* Screen Reader Accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Focus indicators for accessibility */
+button:focus,
+select:focus {
+    outline: 2px solid var(--tg-theme-button-color);
+    outline-offset: 2px;
+}
+
+/* Performance optimizations */
+* {
+    box-sizing: border-box;
+}
+
 :root {
     --tg-theme-bg-color: #fff;
     --tg-theme-text-color: #000;
@@ -234,6 +259,17 @@ body {
     color: var(--tg-theme-link-color);
     display: inline-block;
     pointer-events: auto;
+}
+
+.linklike {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: var(--tg-theme-link-color);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
 }
 
 @media (max-width: 600px) {

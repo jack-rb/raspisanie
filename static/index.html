@@ -3,65 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Расписание</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>Расписание занятий ПГУТИ - Группы и преподаватели | Актуальное расписание</title>
+    <meta name="title" content="Расписание занятий ПГУТИ - Группы и преподаватели | Актуальное расписание">
+    <meta name="description" content="Актуальное расписание занятий ПГУТИ. Просмотр расписания по группам и преподавателям. Удобный календарь занятий с возможностью выбора даты.">
+    <meta name="keywords" content="расписание, ПГУТИ, занятия, группы, преподаватели, календарь, университет, студенты">
+    <meta name="author" content="ПГУТИ">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://raspisanie.space/">
+    <meta property="og:title" content="Расписание занятий ПГУТИ - Группы и преподаватели">
+    <meta property="og:description" content="Актуальное расписание занятий ПГУТИ. Просмотр расписания по группам и преподавателям.">
+    <meta property="og:image" content="https://raspisanie.space/static/images/schedule-preview.jpg">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://raspisanie.space/">
+    <meta property="twitter:title" content="Расписание занятий ПГУТИ - Группы и преподаватели">
+    <meta property="twitter:description" content="Актуальное расписание занятий ПГУТИ. Просмотр расписания по группам и преподавателям.">
+    <meta property="twitter:image" content="https://raspisanie.space/static/images/schedule-preview.jpg">
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="theme-color" content="#2678b6">
+    <meta name="msapplication-TileColor" content="#2678b6">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Расписание ПГУТИ">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://raspisanie.space/">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/static/css/style.css" as="style">
+    <link rel="preload" href="/static/js/app.js" as="script">
+    
+    <!-- Telegram Web App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Расписание занятий ПГУТИ",
+        "description": "Актуальное расписание занятий ПГУТИ с возможностью просмотра по группам и преподавателям",
+        "url": "https://raspisanie.space/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "RUB"
+        },
+        "provider": {
+            "@type": "Organization",
+            "name": "ПГУТИ",
+            "url": "https://psuti.ru/"
+        },
+        "featureList": [
+            "Просмотр расписания по группам",
+            "Просмотр расписания по преподавателям",
+            "Календарь занятий",
+            "Выбор даты",
+            "Мобильная версия"
+        ]
+    }
+    </script>
 </head>
 <body>
-    <div class="mode-switcher">
-        <button id="groupsBtn" class="mode-btn active" title="Группы">
-            <!-- SVG: 3 человечка -->
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="10" r="3" fill="#2678b6"/><circle cx="18" cy="10" r="3" fill="#2678b6"/><circle cx="12" cy="6" r="3" fill="#2678b6"/></svg>
-        </button>
-        <button id="teachersBtn" class="mode-btn" title="Преподаватели">
-            <!-- SVG: 1 человечек -->
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#2678b6"/><rect x="6" y="14" width="12" height="6" rx="3" fill="#2678b6"/></svg>
-        </button>
-    </div>
+    <header>
+        <h1 class="sr-only">Расписание занятий ПГУТИ</h1>
+    </header>
+    
+    <main>
+        <section aria-label="Выбор режима просмотра">
+            <div class="mode-switcher">
+                <button id="groupsBtn" class="mode-btn active" title="Просмотр по группам" aria-label="Переключить на просмотр по группам">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="6" cy="10" r="3" fill="#2678b6"/>
+                        <circle cx="18" cy="10" r="3" fill="#2678b6"/>
+                        <circle cx="12" cy="6" r="3" fill="#2678b6"/>
+                    </svg>
+                    <span>Группы</span>
+                </button>
+                <button id="teachersBtn" class="mode-btn" title="Просмотр по преподавателям" aria-label="Переключить на просмотр по преподавателям">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4" fill="#2678b6"/>
+                        <rect x="6" y="14" width="12" height="6" rx="3" fill="#2678b6"/>
+                    </svg>
+                    <span>Преподаватели</span>
+                </button>
+            </div>
+        </section>
 
-    <select id="groupSelect" class="group-select">
-        <option value="">Выберите группу</option>
-    </select>
+        <section aria-label="Выбор группы или преподавателя">
+            <label for="groupSelect" class="sr-only">Выберите группу или преподавателя</label>
+            <select id="groupSelect" class="group-select" aria-describedby="selectHelp">
+                <option value="">Выберите группу</option>
+            </select>
+            <div id="selectHelp" class="sr-only">Используйте этот список для выбора группы или преподавателя</div>
+        </section>
 
-    <div class="current-date">
-        Сегодня: <span id="todayDate"></span>
-    </div>
-    <div id="userInfo" class="user-info"></div>
+        <section aria-label="Информация о дате">
+            <div class="current-date">
+                Сегодня: <span id="todayDate" aria-live="polite"></span>
+            </div>
+            <div id="userInfo" class="user-info" aria-live="polite"></div>
+        </section>
 
-    <div class="nav-buttons">
-        <button id="prev-day" class="nav-button">← Пред. день</button>
-        <button id="date-picker" class="nav-button date-picker-button">Выбрать дату</button>
-        <button id="next-day" class="nav-button">След. день →</button>
-    </div>
+        <section aria-label="Навигация по датам">
+            <div class="nav-buttons">
+                <button id="prev-day" class="nav-button" aria-label="Предыдущий день">← Пред. день</button>
+                <button id="date-picker" class="nav-button date-picker-button" aria-label="Выбрать дату">Выбрать дату</button>
+                <button id="next-day" class="nav-button" aria-label="Следующий день">След. день →</button>
+            </div>
+            <div style="text-align: center; margin-top: 10px;">
+                <a href="/calendar.html" style="color: var(--tg-theme-link-color, #2678b6); text-decoration: none; font-size: 14px;">
+                    📅 Календарь расписания
+                </a>
+            </div>
+        </section>
 
-    <div class="schedule-container" id="scheduleContainer">
-        <!-- Расписание будет добавлено через JavaScript -->
-    </div>
+        <section aria-label="Расписание занятий">
+            <div class="schedule-container" id="scheduleContainer" role="main" aria-live="polite">
+                <!-- Расписание будет добавлено через JavaScript -->
+            </div>
+        </section>
+    </main>
 
-    <div id="datePickerModal" class="modal">
+    <!-- Modal для выбора даты -->
+    <div id="datePickerModal" class="modal" role="dialog" aria-labelledby="datePickerTitle" aria-hidden="true">
         <div class="modal-content">
             <div class="date-picker-container">
+                <h2 id="datePickerTitle" class="sr-only">Выбор даты</h2>
                 <div class="picker-wheels">
                     <div class="picker-column">
                         <label for="dayWheel" class="wheel-label">День</label>
-                        <select id="dayWheel" class="wheel"></select>
+                        <select id="dayWheel" class="wheel" aria-label="Выберите день"></select>
                     </div>
                     <div class="picker-column">
                         <label for="monthWheel" class="wheel-label">Месяц</label>
-                        <select id="monthWheel" class="wheel"></select>
+                        <select id="monthWheel" class="wheel" aria-label="Выберите месяц"></select>
                     </div>
                     <div class="picker-column">
                         <label for="yearWheel" class="wheel-label">Год</label>
-                        <select id="yearWheel" class="wheel"></select>
+                        <select id="yearWheel" class="wheel" aria-label="Выберите год"></select>
                     </div>
                 </div>
                 <div class="picker-buttons">
-                    <button id="cancelDate" class="modal-button">Отмена</button>
-                    <button id="confirmDate" class="modal-button confirm">OK</button>
+                    <button id="cancelDate" class="modal-button" aria-label="Отменить выбор даты">Отмена</button>
+                    <button id="confirmDate" class="modal-button confirm" aria-label="Подтвердить выбор даты">OK</button>
                 </div>
             </div>
         </div>
     </div>
+
+    <footer>
+        <p class="sr-only">Расписание занятий ПГУТИ - Актуальная информация о занятиях</p>
+    </footer>
 
     <script src="/static/js/app.js"></script>
 </body>

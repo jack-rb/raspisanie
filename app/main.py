@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -172,7 +172,44 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
 
 @app.get("/")
 async def root():
+    """Главная страница расписания ПГУТИ"""
     return FileResponse("static/index.html")
+
+@app.get("/calendar.html")
+async def calendar():
+    """Страница календаря расписания ПГУТИ"""
+    return FileResponse("static/calendar.html")
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    """Sitemap для поисковых систем"""
+    sitemap_content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://raspisanie.space/</loc>
+        <lastmod>2025-08-09</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://raspisanie.space/calendar.html</loc>
+        <lastmod>2025-08-09</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>"""
+    return Response(content=sitemap_content, media_type="application/xml")
+
+@app.get("/robots.txt")
+async def robots():
+    """Robots.txt для поисковых систем"""
+    robots_content = """User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+Sitemap: https://raspisanie.space/sitemap.xml"""
+    return Response(content=robots_content, media_type="text/plain")
 
 @app.get("/test_db")
 @limiter.limit("5/second;100/hour")

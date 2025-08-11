@@ -31,12 +31,35 @@ function updateTodayDate() {
     todayElement.textContent = formatDate(getCurrentDateUTC4(), true);
 }
 
+// Performance optimization: Use passive event listeners
+const addPassiveListener = (element, event, handler) => {
+    element.addEventListener(event, handler, { passive: true });
+};
+
+// Accessibility: Announce changes to screen readers
+const announceToScreenReader = (message) => {
+    const announcement = document.createElement('div');
+    announcement.setAttribute('aria-live', 'polite');
+    announcement.setAttribute('aria-atomic', 'true');
+    announcement.className = 'sr-only';
+    announcement.textContent = message;
+    document.body.appendChild(announcement);
+    
+    // Remove after announcement
+    setTimeout(() => {
+        document.body.removeChild(announcement);
+    }, 1000);
+};
+
 function displaySchedule(schedule, selectedDate) {
     const container = document.getElementById('scheduleContainer');
     container.innerHTML = '';
 
     const dayHeader = document.createElement('div');
     dayHeader.className = 'day-header';
+    dayHeader.setAttribute('role', 'heading');
+    dayHeader.setAttribute('aria-level', '2');
+    
     let headerText = '';
     if (schedule && schedule.date) {
         headerText = schedule.date;
@@ -47,77 +70,103 @@ function displaySchedule(schedule, selectedDate) {
         const year = selectedDate.getFullYear();
         headerText = `${days[selectedDate.getDay()]} ${day}.${month}.${year}`;
     }
+    
     // Добавляем название группы или ФИО преподавателя
     if (currentMode === 'groups' && selectedGroupId && groupMap[selectedGroupId]) {
         headerText += ' — ' + groupMap[selectedGroupId];
     } else if (currentMode === 'teachers' && selectedTeacherName) {
         headerText += ' — ' + selectedTeacherName;
     }
+    
     dayHeader.textContent = headerText;
     container.appendChild(dayHeader);
 
     if (schedule && schedule.lessons && schedule.lessons.length > 0) {
+        const lessonList = document.createElement('div');
+        lessonList.setAttribute('role', 'list');
+        lessonList.setAttribute('aria-label', 'Список занятий');
+        
         schedule.lessons
             .sort((a, b) => a.time.localeCompare(b.time))
-            .forEach(lesson => {
+            .forEach((lesson, index) => {
                 const lessonBlock = document.createElement('div');
                 lessonBlock.className = 'lesson-block';
+                lessonBlock.setAttribute('role', 'listitem');
+                lessonBlock.setAttribute('aria-label', `Занятие ${index + 1}: ${lesson.subject}`);
+                
                 let detailsHtml = `${lesson.type}<br>Аудитория: ${lesson.classroom}<br>`;
                 if (currentMode === 'groups') {
                     // Преподаватель кликабелен
-                    detailsHtml += `Преподаватель: <span class="teacher-link" data-teacher="${encodeURIComponent(lesson.teacher)}">${lesson.teacher}</span>`;
+                    detailsHtml += `Преподаватель: <button type="button" class="linklike teacher-link" data-teacher="${encodeURIComponent(lesson.teacher)}" aria-label="Переключиться на расписание преподавателя ${lesson.teacher}">${lesson.teacher}</button>`;
                 } else if (currentMode === 'teachers') {
                     // Группа кликабельна (если есть)
                     if (lesson.group_id && groupMap[lesson.group_id]) {
-                        detailsHtml += `Группа: <span class="group-link" data-group="${lesson.group_id}">${groupMap[lesson.group_id]}</span><br>`;
+                        detailsHtml += `Группа: <button type="button" class="linklike group-link" data-group="${lesson.group_id}" aria-label="Переключиться на расписание группы ${groupMap[lesson.group_id]}">${groupMap[lesson.group_id]}</button><br>`;
                     }
                     detailsHtml += `Преподаватель: ${lesson.teacher}`;
                 } else {
                     detailsHtml += `Преподаватель: ${lesson.teacher}`;
                 }
+                
                 lessonBlock.innerHTML = `
-                    <div class="time-slot">${lesson.time}</div>
-                    <div class="subject">${lesson.subject}</div>
-                    <div class="details">${detailsHtml}</div>
+                    <div class="time-slot" aria-label="Время занятия">${lesson.time}</div>
+                    <div class="subject" aria-label="Название предмета">${lesson.subject}</div>
+                    <div class="details" aria-label="Детали занятия">${detailsHtml}</div>
                 `;
-                container.appendChild(lessonBlock);
+                lessonList.appendChild(lessonBlock);
             });
+        
+        container.appendChild(lessonList);
+        
         // Добавляем обработчики клика по преподавателю
         container.querySelectorAll('.teacher-link').forEach(link => {
-            link.addEventListener('click', function(e) {
+            const handler = (e) => {
                 e.preventDefault?.();
                 e.stopPropagation?.();
-                const teacher = decodeURIComponent(this.getAttribute('data-teacher'));
+                const teacher = decodeURIComponent(link.getAttribute('data-teacher'));
                 if (teacher) {
                     selectedTeacherName = teacher;
                     selectedGroupId = null;
                     currentMode = 'teachers';
                     document.getElementById('teachersBtn').classList.add('active');
                     document.getElementById('groupsBtn').classList.remove('active');
+                    announceToScreenReader(`Переключено на расписание преподавателя ${teacher}`);
                     loadTeachers(teacher);
                     loadSchedule();
                 }
-            });
+            };
+            link.addEventListener('click', handler);
+            link.addEventListener('pointerdown', handler);
         });
+        
         // Добавляем обработчики клика по группе
         container.querySelectorAll('.group-link').forEach(link => {
-            link.addEventListener('click', function(e) {
+            const handler = (e) => {
                 e.preventDefault?.();
                 e.stopPropagation?.();
-                const groupId = this.getAttribute('data-group');
+                const groupId = link.getAttribute('data-group');
                 if (groupId) {
                     selectedGroupId = groupId;
                     selectedTeacherName = null;
                     currentMode = 'groups';
                     document.getElementById('groupsBtn').classList.add('active');
                     document.getElementById('teachersBtn').classList.remove('active');
+                    const groupName = groupMap[groupId] || groupId;
+                    announceToScreenReader(`Переключено на расписание группы ${groupName}`);
                     loadGroups(groupId);
                     loadSchedule();
                 }
-            });
+            };
+            link.addEventListener('click', handler);
+            link.addEventListener('pointerdown', handler);
         });
     } else {
-        container.innerHTML += '<div class="empty-schedule">Нет занятий в этот день</div>';
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-schedule';
+        emptyMessage.setAttribute('role', 'status');
+        emptyMessage.setAttribute('aria-live', 'polite');
+        emptyMessage.textContent = 'Нет занятий в этот день';
+        container.appendChild(emptyMessage);
     }
 }
 
