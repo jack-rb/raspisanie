@@ -62,37 +62,12 @@
             font-weight: 500;
             transition: all 0.3s ease;
             box-shadow: 0 10px 30px rgba(0, 136, 204, 0.3);
-            margin: 10px;
         }
         
         .telegram-btn:hover {
             background: #006ba3;
             transform: translateY(-2px);
             box-shadow: 0 15px 35px rgba(0, 136, 204, 0.4);
-        }
-        
-        .telegram-btn.web {
-            background: #28a745;
-            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
-        }
-        
-        .telegram-btn.web:hover {
-            background: #218838;
-            box-shadow: 0 15px 35px rgba(40, 167, 69, 0.4);
-        }
-        
-        .buttons-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: center;
-        }
-        
-        @media (min-width: 520px) {
-            .buttons-container {
-                flex-direction: row;
-                justify-content: center;
-            }
         }
         
         .features {
@@ -144,14 +119,9 @@
             Для использования откройте приложение через Telegram.
         </p>
         
-        <div class="buttons-container">
-            <a href="https://t.me/www_test_www_bot" class="telegram-btn">
-                📲 Открыть в Telegram
-            </a>
-            <a href="https://web.telegram.org/k/#@www_test_www_bot" class="telegram-btn web">
-                🌐 Открыть в Telegram Web
-            </a>
-        </div>
+        <a href="https://t.me/www_test_www_bot" class="telegram-btn">
+            📲 Открыть в Telegram
+        </a>
         
         <div class="features">
             <div class="feature">Актуальное расписание по группам</div>
