@@ -633,7 +633,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.13"
+        "app_version": "v1.14"
     }
 
 @app.get("/admin/stats")
@@ -694,7 +694,7 @@ async def generate_schedule_pdf_endpoint(
             
             # Получаем название группы
             groups = ScheduleService.get_all_groups(db)
-            group_name = next((g.name for g in groups if g.id == group_id), f"Группа {group_id}")
+            group_name = next((g["name"] for g in groups if g["id"] == group_id), f"Группа {group_id}")
             
             # Форматируем дату
             try:
