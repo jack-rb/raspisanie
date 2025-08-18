@@ -196,9 +196,9 @@ def _is_telegram_webview(request: Request) -> bool:
             logger.info("✅ Telegram detected via UA marker: %s", marker)
             return True
     
-    # Временно разрешаем все для отладки
-    logger.info("⚠️ Unknown client, allowing temporarily")
-    return True
+    # Если не нашли Telegram маркеры - это обычный браузер
+    logger.info("❌ Regular browser detected")
+    return False
 
 def _extract_user_from_init_data(init_data: str) -> dict | None:
     try:
@@ -257,10 +257,8 @@ async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = 
 async def root(request: Request):
     """Главная страница расписания ПГУТИ (только через Telegram WebView)"""
     if not _is_telegram_webview(request):
-        bot_username = settings.BOT_USERNAME or ""
-        if bot_username:
-            return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
-        raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
+        # Показываем красивую страницу с предложением открыть в Telegram
+        return FileResponse("static/browser-redirect.html")
     return FileResponse("static/index.html")
 
 
@@ -408,7 +406,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.09"
+        "app_version": "v1.10"
     }
 
 @app.post("/webapp/submit")
