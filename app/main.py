@@ -172,7 +172,7 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
 
 def _is_telegram_webview(request: Request) -> bool:
     ua = (request.headers.get("user-agent") or "").lower()
-    return any(marker in ua for marker in ("telegram", "webview", "tgwebview", "telegramwebview"))
+    return any(marker in ua for marker in ("telegram", "webview", "tgwebview", "telegramwebview", "tdesktop", "tdlib"))
 
 def _extract_user_from_init_data(init_data: str) -> dict | None:
     try:
