@@ -114,12 +114,21 @@ def generate_schedule_pdf(schedule_data: dict, group_or_teacher_name: str, date_
         table_data.append(['Время', 'Предмет', 'Тип', 'Аудитория', 'Преподаватель' if not is_teacher else 'Группа'])
         
         for lesson in lessons:
+            # Для преподавателя нужно получить название группы по group_id
+            group_name_for_lesson = ''
+            if is_teacher and lesson.get('group_id'):
+                try:
+                    # Простое получение имени группы (можно расширить)
+                    group_name_for_lesson = f"Группа {lesson.get('group_id')}"
+                except:
+                    group_name_for_lesson = lesson.get('group_name', '')
+            
             row = [
                 lesson.get('time', ''),
                 lesson.get('subject', ''),
                 lesson.get('type', ''),
                 lesson.get('classroom', ''),
-                lesson.get('teacher', '') if not is_teacher else lesson.get('group_name', '')
+                lesson.get('teacher', '') if not is_teacher else group_name_for_lesson
             ]
             table_data.append(row)
         
@@ -697,7 +706,7 @@ async def generate_schedule_pdf_endpoint(
                 formatted_date = date
                 
             pdf_data = generate_schedule_pdf(
-                schedule_data=schedule.__dict__ if schedule else {},
+                schedule_data=schedule if schedule else {},
                 group_or_teacher_name=group_name,
                 date_str=formatted_date,
                 is_teacher=False
@@ -719,7 +728,7 @@ async def generate_schedule_pdf_endpoint(
                 formatted_date = date
                 
             pdf_data = generate_schedule_pdf(
-                schedule_data=schedule.__dict__ if schedule else {},
+                schedule_data=schedule if schedule else {},
                 group_or_teacher_name=teacher_name,
                 date_str=formatted_date,
                 is_teacher=True
