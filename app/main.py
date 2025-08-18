@@ -196,8 +196,15 @@ def _is_telegram_webview(request: Request) -> bool:
             logger.info("✅ Telegram detected via UA marker: %s", marker)
             return True
     
-    # Если не нашли Telegram маркеры - это обычный браузер
-    logger.info("❌ Regular browser detected")
+    # Проверяем наличие initData заголовков - если есть, значит Telegram
+    init_data_headers = ["x-telegram-initdata", "telegram-init-data", "x-telegram-web-app-data"]
+    for header in init_data_headers:
+        if request.headers.get(header):
+            logger.info("✅ Telegram detected via initData header: %s", header)
+            return True
+    
+    # Если нет ни маркеров, ни заголовков - это обычный браузер
+    logger.info("❌ Regular browser detected (no Telegram markers)")
     return False
 
 def _extract_user_from_init_data(init_data: str) -> dict | None:
@@ -406,7 +413,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.10"
+        "app_version": "v1.09"
     }
 
 @app.post("/webapp/submit")
