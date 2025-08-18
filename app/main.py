@@ -439,10 +439,28 @@ async def robots():
     """Robots.txt для поисковых систем"""
     robots_content = """User-agent: *
 Allow: /
+Allow: /static/
+Allow: /groups/
+Allow: /teachers/
 Disallow: /api/
 Disallow: /admin/
+Disallow: /webapp/
 
-Sitemap: https://raspisanie.space/sitemap.xml"""
+# Specific crawl delays for major search engines
+User-agent: Googlebot
+Crawl-delay: 1
+
+User-agent: Yandexbot
+Crawl-delay: 2
+
+User-agent: Bingbot
+Crawl-delay: 3
+
+# Sitemap location
+Sitemap: https://raspisanie.space/static/sitemap.xml
+
+# Additional info
+# Host: raspisanie.space"""
     return Response(content=robots_content, media_type="text/plain")
 
 @app.get("/test_db")
@@ -609,7 +627,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.21"
+        "app_version": "v1.22"
     }
 
 @app.get("/admin/stats")
