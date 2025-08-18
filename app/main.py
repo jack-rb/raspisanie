@@ -1,7 +1,9 @@
 import asyncio
+import time
+from functools import wraps
 from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -29,7 +31,83 @@ import logging
 logger = logging.getLogger("app")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
+# --- Система мониторинга ---
+# Счетчики для статистики
+api_stats = {
+    "requests_count": 0,
+    "errors_count": 0,
+    "response_times": [],
+    "endpoints": {},
+    "popular_groups": {},
+    "popular_teachers": {}
+}
+
+def track_performance(endpoint_name: str):
+    """Декоратор для отслеживания производительности API"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            start_time = time.time()
+            api_stats["requests_count"] += 1
+            
+            try:
+                result = await func(*args, **kwargs)
+                duration = time.time() - start_time
+                
+                # Сохраняем метрики
+                api_stats["response_times"].append(duration)
+                if len(api_stats["response_times"]) > 1000:  # Ограничиваем размер
+                    api_stats["response_times"] = api_stats["response_times"][-500:]
+                
+                if endpoint_name not in api_stats["endpoints"]:
+                    api_stats["endpoints"][endpoint_name] = {"count": 0, "avg_time": 0}
+                
+                stats = api_stats["endpoints"][endpoint_name]
+                stats["count"] += 1
+                stats["avg_time"] = (stats["avg_time"] * (stats["count"] - 1) + duration) / stats["count"]
+                
+                logger.info(f"✅ {endpoint_name}: {duration:.3f}s")
+                return result
+                
+            except Exception as e:
+                duration = time.time() - start_time
+                api_stats["errors_count"] += 1
+                logger.error(f"❌ {endpoint_name}: {duration:.3f}s - {str(e)}")
+                raise
+                
+        return wrapper
+    return decorator
+
 app = FastAPI(title="Schedule API")
+
+# Глобальный обработчик ошибок
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    api_stats["errors_count"] += 1
+    
+    # Логируем детальную информацию об ошибке
+    error_details = {
+        "error": str(exc),
+        "type": type(exc).__name__,
+        "url": str(request.url),
+        "method": request.method,
+        "user_agent": request.headers.get("user-agent", ""),
+        "client_ip": request.client.host if request.client else "unknown"
+    }
+    
+    logger.error(f"💥 Global error: {error_details}")
+    
+    # В зависимости от типа ошибки возвращаем разные ответы
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": exc.detail}
+        )
+    
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"}
+    )
 
 # CORS: разрешаем только Telegram WebApp (можно расширить список)
 app.add_middleware(
@@ -304,6 +382,7 @@ async def test_db(request: Request, user: dict = Depends(verify_telegram_mini_ap
 
 @app.get("/groups/", response_model=List[Group])
 @limiter.limit("5/second;100/hour")
+@track_performance("get_groups")
 async def get_groups(
     request: Request,
     user: dict = Depends(verify_telegram_mini_app),
@@ -314,6 +393,7 @@ async def get_groups(
 
 @app.get("/groups/{group_id}/schedule/{date}", response_model=Day)
 @limiter.limit("5/second;100/hour")
+@track_performance("get_group_schedule")
 async def get_schedule(
     request: Request,
     group_id: int,
@@ -321,12 +401,17 @@ async def get_schedule(
     user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
-    print(f"Запрос расписания для группы {group_id} на дату {date}")  # Отладка
+    # Отслеживаем популярность группы
+    if str(group_id) not in api_stats["popular_groups"]:
+        api_stats["popular_groups"][str(group_id)] = 0
+    api_stats["popular_groups"][str(group_id)] += 1
+    
     schedule = ScheduleService.get_schedule_by_date(db, group_id, date)
     if not schedule:
-        print(f"Расписание не найдено")  # Отладка
+        logger.warning(f"📅 Schedule not found: group_id={group_id}, date={date}")
         raise HTTPException(status_code=404, detail="Schedule not found")
-    print(f"Найдено расписание: {schedule}")  # Отладка
+    
+    logger.info(f"📅 Schedule loaded: group_id={group_id}, date={date}, user={user.get('user_id')}")
     return schedule
 
 @app.get("/days/{day_id}/lessons", response_model=List[Lesson])
@@ -338,6 +423,7 @@ async def get_lessons(
     return ScheduleService.get_lessons_by_day_id(db, day_id)
 
 @app.get("/teachers/", response_model=List[Teacher])
+@track_performance("get_teachers")
 async def get_teachers(
     user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
@@ -347,6 +433,7 @@ async def get_teachers(
 
 @app.get("/teachers/{teacher_name}/schedule/{date}")
 @limiter.limit("5/second;100/hour")
+@track_performance("get_teacher_schedule")
 async def get_teacher_schedule(
     request: Request,
     teacher_name: str = Path(..., description="ФИО преподавателя"),
@@ -354,9 +441,17 @@ async def get_teacher_schedule(
     user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
+    # Отслеживаем популярность преподавателя
+    if teacher_name not in api_stats["popular_teachers"]:
+        api_stats["popular_teachers"][teacher_name] = 0
+    api_stats["popular_teachers"][teacher_name] += 1
+    
     schedule = ScheduleService.get_teacher_schedule_by_date(db, teacher_name, date)
     if not schedule:
+        logger.warning(f"👨‍🏫 Teacher schedule not found: teacher={teacher_name}, date={date}")
         raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    logger.info(f"👨‍🏫 Teacher schedule loaded: teacher={teacher_name}, date={date}, user={user.get('user_id')}")
     return schedule
 
 # Пример защищённого эндпоинта
@@ -413,7 +508,40 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.09"
+        "app_version": "v1.11"
+    }
+
+@app.get("/admin/stats")
+async def get_api_stats():
+    """Эндпоинт для просмотра статистики API"""
+    
+    # Вычисляем среднее время ответа
+    avg_response_time = 0
+    if api_stats["response_times"]:
+        avg_response_time = sum(api_stats["response_times"]) / len(api_stats["response_times"])
+    
+    # Топ-5 популярных групп
+    top_groups = sorted(
+        api_stats["popular_groups"].items(), 
+        key=lambda x: x[1], 
+        reverse=True
+    )[:5]
+    
+    # Топ-5 популярных преподавателей
+    top_teachers = sorted(
+        api_stats["popular_teachers"].items(), 
+        key=lambda x: x[1], 
+        reverse=True
+    )[:5]
+    
+    return {
+        "total_requests": api_stats["requests_count"],
+        "total_errors": api_stats["errors_count"],
+        "error_rate": round(api_stats["errors_count"] / max(api_stats["requests_count"], 1) * 100, 2),
+        "avg_response_time": round(avg_response_time, 3),
+        "endpoints": api_stats["endpoints"],
+        "top_groups": [{"group_id": gid, "requests": count} for gid, count in top_groups],
+        "top_teachers": [{"teacher": name, "requests": count} for name, count in top_teachers]
     }
 
 @app.post("/webapp/submit")
