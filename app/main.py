@@ -15,15 +15,6 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import hmac as _hmaclib
 from fastapi.middleware.cors import CORSMiddleware
-import io
-from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
 from .core.database import get_db
 from .services.schedule import ScheduleService
@@ -51,112 +42,7 @@ api_stats = {
     "popular_teachers": {}
 }
 
-# --- PDF Generation ---
-def generate_schedule_pdf(schedule_data: dict, group_or_teacher_name: str, date_str: str, is_teacher: bool = False) -> bytes:
-    """Генерирует PDF с расписанием"""
-    
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    
-    styles = getSampleStyleSheet()
-    
-    # Создаем кастомные стили
-    title_style = ParagraphStyle(
-        'TitleStyle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=20,
-        alignment=1,  # Центрирование
-        textColor=colors.darkblue
-    )
-    
-    header_style = ParagraphStyle(
-        'HeaderStyle', 
-        parent=styles['Heading2'],
-        fontSize=14,
-        spaceAfter=15,
-        alignment=1,
-        textColor=colors.darkgreen
-    )
-    
-    lesson_style = ParagraphStyle(
-        'LessonStyle',
-        parent=styles['Normal'],
-        fontSize=11,
-        spaceAfter=8,
-        leftIndent=10
-    )
-    
-    story = []
-    
-    # Заголовок
-    story.append(Paragraph("Расписание занятий ПГУТИ", title_style))
-    story.append(Spacer(1, 0.5*cm))
-    
-    # Дата и группа/преподаватель
-    if is_teacher:
-        header_text = f"{date_str} — {group_or_teacher_name}"
-    else:
-        header_text = f"{date_str} — {group_or_teacher_name}"
-    
-    story.append(Paragraph(header_text, header_style))
-    story.append(Spacer(1, 0.8*cm))
-    
-    # Проверяем наличие занятий
-    if not schedule_data or not schedule_data.get('lessons'):
-        story.append(Paragraph("Нет занятий в этот день", lesson_style))
-    else:
-        # Сортируем занятия по времени
-        lessons = sorted(schedule_data['lessons'], key=lambda x: x.get('time', ''))
-        
-        # Создаем таблицу для занятий
-        table_data = []
-        table_data.append(['Время', 'Предмет', 'Тип', 'Аудитория', 'Преподаватель' if not is_teacher else 'Группа'])
-        
-        for lesson in lessons:
-            row = [
-                lesson.get('time', ''),
-                lesson.get('subject', ''),
-                lesson.get('type', ''),
-                lesson.get('classroom', ''),
-                lesson.get('teacher', '') if not is_teacher else lesson.get('group_name', '')
-            ]
-            table_data.append(row)
-        
-        # Создаем таблицу
-        table = Table(table_data, colWidths=[2.5*cm, 5*cm, 2.5*cm, 2.5*cm, 4*cm])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
-        ]))
-        
-        story.append(table)
-    
-    # Добавляем футер
-    story.append(Spacer(1, 1*cm))
-    footer_style = ParagraphStyle(
-        'FooterStyle',
-        parent=styles['Normal'],
-        fontSize=8,
-        alignment=1,
-        textColor=colors.grey
-    )
-    story.append(Paragraph(f"Сгенерировано: {datetime.now().strftime('%d.%m.%Y %H:%M')}", footer_style))
-    story.append(Paragraph("Поволжский государственный университет телекоммуникаций и информатики", footer_style))
-    
-    # Строим PDF
-    doc.build(story)
-    buffer.seek(0)
-    return buffer.getvalue()
+
 
 def track_performance(endpoint_name: str):
     """Декоратор для отслеживания производительности API"""
@@ -624,7 +510,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.12"
+        "app_version": "v1.20"
     }
 
 @app.get("/admin/stats")
@@ -660,105 +546,7 @@ async def get_api_stats():
         "top_teachers": [{"teacher": name, "requests": count} for name, count in top_teachers]
     }
 
-@app.post("/generate-schedule-pdf")
-@track_performance("generate_pdf")
-async def generate_schedule_pdf_endpoint(
-    request: Request,
-    user: dict = Depends(verify_telegram_mini_app),
-    db: Session = Depends(get_db)
-):
-    """Генерирует PDF с текущим расписанием и отправляет пользователю в Telegram"""
-    
-    try:
-        body = await request.json()
-        group_id = body.get("group_id")
-        teacher_name = body.get("teacher_name") 
-        date = body.get("date")
-        
-        if not date:
-            raise HTTPException(status_code=400, detail="Date is required")
-        
-        # Определяем что генерируем - группу или преподавателя
-        if group_id:
-            # Генерируем PDF для группы
-            schedule = ScheduleService.get_schedule_by_date(db, group_id, date)
-            
-            # Получаем название группы
-            groups = ScheduleService.get_all_groups(db)
-            group_name = next((g.name for g in groups if g.id == group_id), f"Группа {group_id}")
-            
-            # Форматируем дату
-            try:
-                from datetime import datetime
-                date_obj = datetime.strptime(date, "%Y-%m-%d")
-                days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
-                formatted_date = f"{days[date_obj.weekday()]} {date_obj.strftime('%d.%m.%Y')}"
-            except:
-                formatted_date = date
-                
-            pdf_data = generate_schedule_pdf(
-                schedule_data=schedule.__dict__ if schedule else {},
-                group_or_teacher_name=group_name,
-                date_str=formatted_date,
-                is_teacher=False
-            )
-            
-            filename = f"Расписание_{group_name}_{date}.pdf"
-            
-        elif teacher_name:
-            # Генерируем PDF для преподавателя
-            schedule = ScheduleService.get_teacher_schedule_by_date(db, teacher_name, date)
-            
-            # Форматируем дату
-            try:
-                from datetime import datetime
-                date_obj = datetime.strptime(date, "%Y-%m-%d")
-                days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
-                formatted_date = f"{days[date_obj.weekday()]} {date_obj.strftime('%d.%m.%Y')}"
-            except:
-                formatted_date = date
-                
-            pdf_data = generate_schedule_pdf(
-                schedule_data=schedule.__dict__ if schedule else {},
-                group_or_teacher_name=teacher_name,
-                date_str=formatted_date,
-                is_teacher=True
-            )
-            
-            filename = f"Расписание_{teacher_name.replace(' ', '_')}_{date}.pdf"
-            
-        else:
-            raise HTTPException(status_code=400, detail="Either group_id or teacher_name is required")
-        
-        # Отправляем PDF пользователю в Telegram
-        user_id = user.get("user_id")
-        if user_id and user_id != "public" and user_id != "anonymous":
-            try:
-                # Создаем объект файла для отправки
-                pdf_file = io.BytesIO(pdf_data)
-                pdf_file.name = filename
-                
-                # Отправляем PDF через бота
-                await bot.send_document(
-                    chat_id=int(user_id),
-                    document=pdf_file,
-                    caption=f"📄 {filename}",
-                    parse_mode="HTML"
-                )
-                
-                logger.info(f"📄 PDF sent to user {user_id}: {filename}")
-                
-            except Exception as e:
-                logger.error(f"❌ Failed to send PDF to user {user_id}: {e}")
-                raise HTTPException(status_code=500, detail="Failed to send PDF to Telegram")
-        
-        return {"status": "success", "message": "PDF generated and sent"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ PDF generation error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate PDF")
+
 
 @app.post("/webapp/submit")
 @limiter.limit("5/second;100/hour")
