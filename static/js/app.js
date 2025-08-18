@@ -81,6 +81,14 @@ function displaySchedule(schedule, selectedDate) {
     dayHeader.textContent = headerText;
     container.appendChild(dayHeader);
 
+    // Показываем кнопку PDF если есть расписание
+    const pdfBtn = document.getElementById('downloadPdfBtn');
+    if ((selectedGroupId || selectedTeacherName) && schedule && schedule.lessons && schedule.lessons.length > 0) {
+        pdfBtn.style.display = 'inline-flex';
+    } else {
+        pdfBtn.style.display = 'none';
+    }
+
     if (schedule && schedule.lessons && schedule.lessons.length > 0) {
         const lessonList = document.createElement('div');
         lessonList.setAttribute('role', 'list');
@@ -135,8 +143,10 @@ function displaySchedule(schedule, selectedDate) {
                     loadSchedule();
                 }
             };
-            link.addEventListener('click', handler);
-            link.addEventListener('pointerdown', handler);
+            // Множественные события для Telegram Desktop
+            ['click', 'mousedown', 'touchstart', 'pointerdown'].forEach(evt => {
+                link.addEventListener(evt, handler, { passive: false });
+            });
         });
         
         // Добавляем обработчики клика по группе
@@ -157,8 +167,10 @@ function displaySchedule(schedule, selectedDate) {
                     loadSchedule();
                 }
             };
-            link.addEventListener('click', handler);
-            link.addEventListener('pointerdown', handler);
+            // Множественные события для Telegram Desktop
+            ['click', 'mousedown', 'touchstart', 'pointerdown'].forEach(evt => {
+                link.addEventListener(evt, handler, { passive: false });
+            });
         });
     } else {
         const emptyMessage = document.createElement('div');
@@ -389,6 +401,70 @@ async function loadAppVersion() {
     }
 }
 
+async function generatePDF() {
+    const pdfBtn = document.getElementById('downloadPdfBtn');
+    
+    try {
+        // Показываем состояние загрузки
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = '⏳ Генерируем PDF...';
+        
+        // Формируем текущую дату
+        const adjustedDate = new Date(currentDate);
+        adjustedDate.setDate(adjustedDate.getDate() + 1);
+        const dateStr = adjustedDate.toISOString().split('T')[0];
+        
+        // Подготавливаем данные для запроса
+        const requestData = {
+            date: dateStr
+        };
+        
+        if (currentMode === 'groups' && selectedGroupId) {
+            requestData.group_id = parseInt(selectedGroupId);
+        } else if (currentMode === 'teachers' && selectedTeacherName) {
+            requestData.teacher_name = selectedTeacherName;
+        } else {
+            throw new Error('Не выбрана группа или преподаватель');
+        }
+        
+        // Отправляем запрос на генерацию PDF
+        const response = await fetchWithInitData('/generate-schedule-pdf', {
+            method: 'POST',
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Показываем успешное сообщение
+            pdfBtn.textContent = '✅ PDF отправлен!';
+            announceToScreenReader('PDF файл с расписанием отправлен в Telegram');
+            
+            // Через 3 секунды возвращаем обычный вид кнопки
+            setTimeout(() => {
+                pdfBtn.disabled = false;
+                pdfBtn.textContent = '📄 Скачать PDF';
+            }, 3000);
+            
+        } else {
+            throw new Error('Ошибка генерации PDF');
+        }
+        
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        
+        // Показываем ошибку
+        pdfBtn.textContent = '❌ Ошибка';
+        announceToScreenReader('Ошибка при генерации PDF');
+        
+        // Через 3 секунды возвращаем обычный вид кнопки
+        setTimeout(() => {
+            pdfBtn.disabled = false;
+            pdfBtn.textContent = '📄 Скачать PDF';
+        }, 3000);
+    }
+}
+
 function initDatePicker() {
     const dayWheel = document.getElementById('dayWheel');
     const monthWheel = document.getElementById('monthWheel');
@@ -481,14 +557,34 @@ document.getElementById('confirmDate').addEventListener('click', () => {
     document.getElementById('datePickerModal').style.display = 'none';
 });
 
-document.getElementById('groupsBtn').addEventListener('click', (e) => { e.preventDefault?.(); e.stopPropagation?.(); setMode('groups'); });
-document.getElementById('teachersBtn').addEventListener('click', (e) => { e.preventDefault?.(); e.stopPropagation?.(); setMode('teachers'); });
+// Telegram Desktop fix: множественные обработчики событий
+function setupModeButtons() {
+    const groupsBtn = document.getElementById('groupsBtn');
+    const teachersBtn = document.getElementById('teachersBtn');
+    
+    const groupsHandler = (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        setMode('groups');
+    };
+    
+    const teachersHandler = (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        setMode('teachers');
+    };
+    
+    // Множественные события для Telegram Desktop
+    ['click', 'mousedown', 'touchstart', 'pointerdown'].forEach(evt => {
+        groupsBtn.addEventListener(evt, groupsHandler, { passive: false });
+        teachersBtn.addEventListener(evt, teachersHandler, { passive: false });
+    });
+}
 
-// Fallback for Telegram Desktop: also bind mousedown
-['mousedown', 'touchstart'].forEach(evt => {
-    document.getElementById('groupsBtn').addEventListener(evt, (e) => { e.stopPropagation?.(); });
-    document.getElementById('teachersBtn').addEventListener(evt, (e) => { e.stopPropagation?.(); });
-});
+setupModeButtons();
+
+// PDF Download Button Event Listener
+document.getElementById('downloadPdfBtn').addEventListener('click', generatePDF);
 
 // Инициализация
 (async function initApp(){
