@@ -408,7 +408,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.08"
+        "app_version": "v1.09"
     }
 
 @app.post("/webapp/submit")
