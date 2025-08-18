@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import FastAPI, Depends, HTTPException, Path, Header, Request, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -170,14 +170,82 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
     return True
 # --- Конец блока проверки Init Data ---
 
+def _is_telegram_webview(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    return any(marker in ua for marker in ("telegram", "webview", "tgwebview", "telegramwebview"))
+
+def _extract_user_from_init_data(init_data: str) -> dict | None:
+    try:
+        import json
+        data = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=False, encoding='utf-8', errors='ignore'))
+        if 'user' in data:
+            u = json.loads(data['user'])
+            return {
+                "user_id": int(u.get('id')) if u.get('id') is not None else None,
+                "username": u.get('username'),
+                "first_name": u.get('first_name'),
+                "last_name": u.get('last_name'),
+                "language_code": u.get('language_code')
+            }
+        if 'user_id' in data:
+            return {"user_id": int(data['user_id'])}
+    except Exception:
+        pass
+    return None
+
+async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = Header(None)):
+    # Разрешение на публичный доступ только как временный костыль (отключить в проде)
+    if settings.ALLOW_PUBLIC:
+        return {"user_id": "public"}
+
+    # Доступ только из Telegram WebView
+    if not _is_telegram_webview(request):
+        bot_username = settings.BOT_USERNAME or ""
+        if bot_username:
+            raise HTTPException(status_code=302, detail="open in Telegram", headers={"Location": f"https://t.me/{bot_username}"})
+        raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
+
+    # Ищем initData: тело -> заголовки -> query
+    init_data_body = None
+    try:
+        if request.method == "POST":
+            body = await request.json()
+            if isinstance(body, dict):
+                init_data_body = body.get("initData") or body.get("init_data")
+    except Exception:
+        pass
+    if init_data_body:
+        init_data, src = init_data_body, "body.initData"
+    else:
+        init_data, src = _extract_init_data(request, x_telegram_initdata)
+
+    if not init_data or not check_telegram_init_data(init_data, src):
+        logger.info("Auth failed %s %s (src=%s)", request.method, request.url.path, src)
+        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
+
+    user = _extract_user_from_init_data(init_data)
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Invalid user in Init Data")
+    return user
+
 @app.get("/")
-async def root():
-    """Главная страница расписания ПГУТИ"""
+async def root(request: Request):
+    """Главная страница расписания ПГУТИ (только через Telegram WebView)"""
+    if not _is_telegram_webview(request):
+        bot_username = settings.BOT_USERNAME or ""
+        if bot_username:
+            return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
+        raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
     return FileResponse("static/index.html")
 
 @app.get("/calendar.html")
-async def calendar():
-    """Страница календаря расписания ПГУТИ"""
+async def calendar(request: Request):
+    """Страница календаря расписания ПГУТИ (только через Telegram WebView)"""
+    if not _is_telegram_webview(request):
+        bot_username = settings.BOT_USERNAME or ""
+        if bot_username:
+            return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
+        raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
     return FileResponse("static/calendar.html")
 
 @app.get("/sitemap.xml")
@@ -213,19 +281,18 @@ Sitemap: https://raspisanie.space/sitemap.xml"""
 
 @app.get("/test_db")
 @limiter.limit("5/second;100/hour")
-async def test_db(request: Request, db: Session = Depends(get_db)):
+async def test_db(request: Request, user: dict = Depends(verify_telegram_mini_app), db: Session = Depends(get_db)):
     groups = ScheduleService.get_all_groups(db)
-    return {"groups_count": len(groups), "groups": groups}
+    return {"groups_count": len(groups), "groups": groups, "user": user}
 
 @app.get("/groups/", response_model=List[Group])
 @limiter.limit("5/second;100/hour")
 async def get_groups(
     request: Request,
-    verified: bool = Depends(verify_init_data),
+    user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
     groups = ScheduleService.get_all_groups(db)
-    print("Получены группы из БД:", groups)  # Отладка
     return groups
 
 @app.get("/groups/{group_id}/schedule/{date}", response_model=Day)
@@ -234,7 +301,7 @@ async def get_schedule(
     request: Request,
     group_id: int,
     date: str,
-    verified: bool = Depends(verify_init_data),
+    user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
     print(f"Запрос расписания для группы {group_id} на дату {date}")  # Отладка
@@ -246,11 +313,18 @@ async def get_schedule(
     return schedule
 
 @app.get("/days/{day_id}/lessons", response_model=List[Lesson])
-async def get_lessons(day_id: int, db: Session = Depends(get_db)):
+async def get_lessons(
+    day_id: int,
+    user: dict = Depends(verify_telegram_mini_app),
+    db: Session = Depends(get_db)
+):
     return ScheduleService.get_lessons_by_day_id(db, day_id)
 
 @app.get("/teachers/", response_model=List[Teacher])
-async def get_teachers(db: Session = Depends(get_db)):
+async def get_teachers(
+    user: dict = Depends(verify_telegram_mini_app),
+    db: Session = Depends(get_db)
+):
     teachers = ScheduleService.get_all_teachers(db)
     return teachers
 
@@ -260,7 +334,7 @@ async def get_teacher_schedule(
     request: Request,
     teacher_name: str = Path(..., description="ФИО преподавателя"),
     date: str = Path(..., description="Дата в формате YYYY-MM-DD"),
-    verified: bool = Depends(verify_init_data),
+    user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
     schedule = ScheduleService.get_teacher_schedule_by_date(db, teacher_name, date)
@@ -273,81 +347,45 @@ async def get_teacher_schedule(
 @limiter.limit("5/second;100/hour")
 async def secure_endpoint(
     request: Request,
-    verified: bool = Depends(verify_init_data),
+    user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
     # Ваш код для защищённого эндпоинта
     return {"status": "ok"}
 
 @app.get("/whoami")
-async def whoami(request: Request, x_telegram_initdata: str = Header(None)):
-    # extract initData using the same extraction helper
-    # read body once
-    init_data_body = None
-    try:
-        body = await request.json()
-        if isinstance(body, dict):
-            init_data_body = body.get("initData") or body.get("init_data")
-    except Exception:
-        pass
-    if init_data_body:
-        init_data, src = init_data_body, "body.initData"
-    else:
-        init_data, src = _extract_init_data(request, x_telegram_initdata)
-    if not settings.ALLOW_PUBLIC and (not init_data or not check_telegram_init_data(init_data, src)):
-        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
-    # parse minimal user
-    info = {"source": src}
-    try:
-        init_data = (init_data or "").strip()
-        if len(init_data) >= 2 and ((init_data[0] == '"' and init_data[-1] == '"') or (init_data[0] == "'" and init_data[-1] == "'")):
-            init_data = init_data[1:-1]
-        data = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=False, encoding='utf-8', errors='ignore'))
-        import json
-        if 'user' in data:
-            u = json.loads(data['user'])
-            info.update({
-                "user_id": u.get('id'),
-                "username": u.get('username'),
-                "first_name": u.get('first_name'),
-                "last_name": u.get('last_name')
-            })
-    except Exception:
-        pass
-    return info
+async def whoami(user: dict = Depends(verify_telegram_mini_app)):
+    return {
+        "user_id": user.get("user_id"),
+        "username": user.get("username"),
+        "first_name": user.get("first_name"),
+        "last_name": user.get("last_name"),
+        "source": "telegram_mini_app"
+    }
 
 @app.get("/user/selection")
-async def get_user_selection(request: Request, db: Session = Depends(get_db)):
-    init_data = request.headers.get("x-telegram-initdata")
-    payload = AuthHelpers.verify_init_data(init_data)
-    if not payload:
-        if settings.ALLOW_PUBLIC:
-            return {"last_selected_group_id": None, "last_selected_teacher": None}
-        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
-    AuthHelpers.upsert_user(db, payload)
+async def get_user_selection(user: dict = Depends(verify_telegram_mini_app), db: Session = Depends(get_db)):
+    if user.get('user_id') == "public":
+        return {"last_selected_group_id": None, "last_selected_teacher": None}
+    AuthHelpers.upsert_user(db, user)
     from .models.schedule import User
-    user = db.query(User).filter(User.tg_user_id == payload.get('user_id')).first()
-    if not user:
+    u = db.query(User).filter(User.tg_user_id == user.get('user_id')).first()
+    if not u:
         return {"last_selected_group_id": None, "last_selected_teacher": None}
     return {
-        "last_selected_group_id": user.last_selected_group_id,
-        "last_selected_teacher": user.last_selected_teacher,
+        "last_selected_group_id": u.last_selected_group_id,
+        "last_selected_teacher": u.last_selected_teacher,
     }
 
 @app.post("/user/selection")
-async def set_user_selection(request: Request, db: Session = Depends(get_db)):
+async def set_user_selection(request: Request, user: dict = Depends(verify_telegram_mini_app), db: Session = Depends(get_db)):
     body = await request.json()
-    init_data = body.get("initData") or request.headers.get("x-telegram-initdata")
-    payload = AuthHelpers.verify_init_data(init_data)
-    if not payload:
-        if not settings.ALLOW_PUBLIC:
-            raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
-        # В публичном режиме сохранять нечего
+    if user.get('user_id') == "public":
         return {"ok": True}
-    AuthHelpers.upsert_user(db, payload)
+    AuthHelpers.upsert_user(db, user)
     AuthHelpers.save_last_selection(
         db,
-        user_id=payload.get('user_id'),
+        user_id=user.get('user_id'),
         group_id=body.get('group_id'),
         teacher=body.get('teacher'),
     )
@@ -362,14 +400,11 @@ async def config_public():
 
 @app.post("/webapp/submit")
 @limiter.limit("5/second;100/hour")
-async def webapp_submit(request: Request):
+async def webapp_submit(request: Request, user: dict = Depends(verify_telegram_mini_app)):
     body = await request.json()
     query_id = body.get("query_id")
-    init_data = body.get("initData") or request.headers.get("telegram-init-data") or request.headers.get("x-telegram-web-app-data")
     if not query_id:
         raise HTTPException(status_code=400, detail="query_id required")
-    if not settings.ALLOW_PUBLIC and (not init_data or not check_telegram_init_data(init_data, "submit.body")):
-        raise HTTPException(status_code=401, detail="Invalid Telegram Init Data")
     # Build result
     payload = body.get("data")
     text = f"Данные получены: {payload}" if payload is not None else "Данные получены"

@@ -174,6 +174,11 @@ function displaySchedule(schedule, selectedDate) {
 async function fetchWithInitData(url, options = {}) {
     const tg = window.Telegram.WebApp;
     const initData = tg && tg.initData ? tg.initData : '';
+    // Если нет initData, сразу просим открыть через Telegram и прекращаем
+    if (!initData) {
+        await showOpenInTelegram();
+        throw new Error('No initData available');
+    }
     const commonHeaders = {
         'X-Telegram-InitData': initData,
         'Telegram-Init-Data': initData,
@@ -182,7 +187,13 @@ async function fetchWithInitData(url, options = {}) {
     if (!options.method || options.method.toUpperCase() === 'GET') {
         options.headers = Object.assign({}, options.headers || {}, commonHeaders);
         const resp = await fetch(url, options);
-        if (resp.status === 401) await showOpenInTelegram();
+        if (resp.status === 401) {
+            await showOpenInTelegram();
+            throw new Error('Unauthorized');
+        } else if (resp.status === 302) {
+            await showOpenInTelegram();
+            throw new Error('Redirect to Telegram');
+        }
         return resp;
     } else {
         let body = options.body ? JSON.parse(options.body) : {};
@@ -190,7 +201,13 @@ async function fetchWithInitData(url, options = {}) {
         options.body = JSON.stringify(body);
         options.headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' }, commonHeaders);
         const resp = await fetch(url, options);
-        if (resp.status === 401) await showOpenInTelegram();
+        if (resp.status === 401) {
+            await showOpenInTelegram();
+            throw new Error('Unauthorized');
+        } else if (resp.status === 302) {
+            await showOpenInTelegram();
+            throw new Error('Redirect to Telegram');
+        }
         return resp;
     }
 }
