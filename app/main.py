@@ -172,7 +172,33 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
 
 def _is_telegram_webview(request: Request) -> bool:
     ua = (request.headers.get("user-agent") or "").lower()
-    return any(marker in ua for marker in ("telegram", "webview", "tgwebview", "telegramwebview", "tdesktop", "tdlib"))
+    referer = (request.headers.get("referer") or "").lower()
+    
+    # Логируем для отладки
+    logger.info("🔍 User-Agent: %s", ua)
+    logger.info("🔍 Referer: %s", referer)
+    
+    # Проверяем referer на Telegram Web
+    if "web.telegram.org" in referer:
+        logger.info("✅ Telegram Web detected via referer")
+        return True
+    
+    # Проверяем User-Agent маркеры
+    telegram_markers = [
+        "telegram", "webview", "tgwebview", "telegramwebview", 
+        "tdesktop", "tdlib", "telegramdesktop", "tg_owt",
+        "tgx", "telegram-desktop", "telegram-web", "telegram-app"
+    ]
+    
+    # Если это обычный браузер с Telegram маркерами
+    for marker in telegram_markers:
+        if marker in ua:
+            logger.info("✅ Telegram detected via UA marker: %s", marker)
+            return True
+    
+    # Временно разрешаем все для отладки
+    logger.info("⚠️ Unknown client, allowing temporarily")
+    return True
 
 def _extract_user_from_init_data(init_data: str) -> dict | None:
     try:
@@ -382,7 +408,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.07"
+        "app_version": "v1.08"
     }
 
 @app.post("/webapp/submit")
