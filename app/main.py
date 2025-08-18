@@ -237,15 +237,7 @@ async def root(request: Request):
         raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
     return FileResponse("static/index.html")
 
-@app.get("/calendar.html")
-async def calendar(request: Request):
-    """Страница календаря расписания ПГУТИ (только через Telegram WebView)"""
-    if not _is_telegram_webview(request):
-        bot_username = settings.BOT_USERNAME or ""
-        if bot_username:
-            return RedirectResponse(url=f"https://t.me/{bot_username}", status_code=302)
-        raise HTTPException(status_code=403, detail="Access denied: open via Telegram")
-    return FileResponse("static/calendar.html")
+
 
 @app.get("/sitemap.xml")
 async def sitemap():
@@ -258,12 +250,7 @@ async def sitemap():
         <changefreq>daily</changefreq>
         <priority>1.0</priority>
     </url>
-    <url>
-        <loc>https://raspisanie.space/calendar.html</loc>
-        <lastmod>2025-08-09</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.8</priority>
-    </url>
+
 </urlset>"""
     return Response(content=sitemap_content, media_type="application/xml")
 
@@ -394,7 +381,8 @@ async def set_user_selection(request: Request, user: dict = Depends(verify_teleg
 async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
-        "domain": settings.DOMAIN
+        "domain": settings.DOMAIN,
+        "app_version": "v1.07"
     }
 
 @app.post("/webapp/submit")

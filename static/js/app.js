@@ -374,6 +374,21 @@ async function showUserInfo() {
     }
 }
 
+async function loadAppVersion() {
+    try {
+        const resp = await fetch('/config-public');
+        if (resp.ok) {
+            const config = await resp.json();
+            const versionEl = document.getElementById('appVersion');
+            if (versionEl && config.app_version) {
+                versionEl.textContent = config.app_version;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load app version:', e);
+    }
+}
+
 function initDatePicker() {
     const dayWheel = document.getElementById('dayWheel');
     const monthWheel = document.getElementById('monthWheel');
@@ -483,5 +498,6 @@ document.getElementById('teachersBtn').addEventListener('click', (e) => { e.prev
     initDatePicker();
     await loadLastSelection();
     await showUserInfo();
+    await loadAppVersion();
 })();
 });
