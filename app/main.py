@@ -15,6 +15,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import hmac as _hmaclib
 from fastapi.middleware.cors import CORSMiddleware
+import redis
+import json
+from datetime import datetime, timedelta
 
 from .core.database import get_db
 from .services.schedule import ScheduleService
@@ -31,6 +34,24 @@ import logging
 logger = logging.getLogger("app")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
+# --- Redis подключение ---
+try:
+    redis_client = redis.Redis(
+        host=os.getenv('REDIS_HOST', 'redis'),
+        port=int(os.getenv('REDIS_PORT', 6379)),
+        db=int(os.getenv('REDIS_DB', 0)),
+        password=os.getenv('REDIS_PASSWORD'),
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5
+    )
+    # Проверка подключения
+    redis_client.ping()
+    logger.info("✅ Redis подключен успешно")
+except Exception as e:
+    logger.warning(f"⚠️ Redis недоступен: {e}. Работаем без кеша")
+    redis_client = None
+
 # --- Система мониторинга ---
 # Счетчики для статистики
 api_stats = {
@@ -41,6 +62,54 @@ api_stats = {
     "popular_groups": {},
     "popular_teachers": {}
 }
+
+# --- Система кеширования ---
+def get_cache_key(prefix: str, *args) -> str:
+    """Генерация ключа для кеша"""
+    return f"{prefix}:" + ":".join(str(arg) for arg in args)
+
+def is_cacheable_date(date_str: str) -> bool:
+    """Проверяем, стоит ли кешировать эту дату (только сегодня + завтра)"""
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        today = datetime.now().date()
+        tomorrow = today + timedelta(days=1)
+        return target_date in [today, tomorrow]
+    except:
+        return False
+
+def get_cache_ttl(date_str: str) -> int:
+    """TTL для кеша: до 02:00 следующего дня"""
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        # Кеш истекает в 02:00 следующего дня после target_date
+        expire_datetime = datetime.combine(target_date + timedelta(days=1), datetime.min.time().replace(hour=2))
+        ttl = int((expire_datetime - datetime.now()).total_seconds())
+        return max(ttl, 60)  # Минимум 1 минута
+    except:
+        return 3600  # Fallback: 1 час
+
+def get_from_cache(cache_key: str):
+    """Безопасное получение из кеша"""
+    if not redis_client:
+        return None
+    try:
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            return json.loads(cached_data)
+    except Exception as e:
+        logger.warning(f"❌ Ошибка чтения кеша {cache_key}: {e}")
+    return None
+
+def set_to_cache(cache_key: str, data, ttl: int):
+    """Безопасное сохранение в кеш"""
+    if not redis_client:
+        return
+    try:
+        redis_client.setex(cache_key, ttl, json.dumps(data, ensure_ascii=False, default=str))
+        logger.info(f"💾 Кеш сохранён: {cache_key} (TTL: {ttl}s)")
+    except Exception as e:
+        logger.warning(f"❌ Ошибка записи кеша {cache_key}: {e}")
 
 
 
@@ -408,10 +477,25 @@ async def get_schedule(
         api_stats["popular_groups"][str(group_id)] = 0
     api_stats["popular_groups"][str(group_id)] += 1
     
+    # 🚀 Проверяем кеш для сегодня/завтра
+    if is_cacheable_date(date):
+        cache_key = get_cache_key("group_schedule", group_id, date)
+        cached_schedule = get_from_cache(cache_key)
+        if cached_schedule:
+            logger.info(f"💾 Schedule from cache: group_id={group_id}, date={date}, user={user.get('user_id')}")
+            return cached_schedule
+    
+    # Загружаем из БД
     schedule = ScheduleService.get_schedule_by_date(db, group_id, date)
     if not schedule:
         logger.warning(f"📅 Schedule not found: group_id={group_id}, date={date}")
         raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # 🚀 Сохраняем в кеш для сегодня/завтра
+    if is_cacheable_date(date):
+        cache_key = get_cache_key("group_schedule", group_id, date)
+        ttl = get_cache_ttl(date)
+        set_to_cache(cache_key, schedule, ttl)
     
     logger.info(f"📅 Schedule loaded: group_id={group_id}, date={date}, user={user.get('user_id')}")
     return schedule
@@ -448,10 +532,25 @@ async def get_teacher_schedule(
         api_stats["popular_teachers"][teacher_name] = 0
     api_stats["popular_teachers"][teacher_name] += 1
     
+    # 🚀 Проверяем кеш для сегодня/завтра
+    if is_cacheable_date(date):
+        cache_key = get_cache_key("teacher_schedule", teacher_name, date)
+        cached_schedule = get_from_cache(cache_key)
+        if cached_schedule:
+            logger.info(f"💾 Teacher schedule from cache: teacher={teacher_name}, date={date}, user={user.get('user_id')}")
+            return cached_schedule
+    
+    # Загружаем из БД
     schedule = ScheduleService.get_teacher_schedule_by_date(db, teacher_name, date)
     if not schedule:
         logger.warning(f"👨‍🏫 Teacher schedule not found: teacher={teacher_name}, date={date}")
         raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    # 🚀 Сохраняем в кеш для сегодня/завтра
+    if is_cacheable_date(date):
+        cache_key = get_cache_key("teacher_schedule", teacher_name, date)
+        ttl = get_cache_ttl(date)
+        set_to_cache(cache_key, schedule, ttl)
     
     logger.info(f"👨‍🏫 Teacher schedule loaded: teacher={teacher_name}, date={date}, user={user.get('user_id')}")
     return schedule
@@ -510,7 +609,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.20"
+        "app_version": "v1.21"
     }
 
 @app.get("/admin/stats")
@@ -536,6 +635,19 @@ async def get_api_stats():
         reverse=True
     )[:5]
     
+    # 🚀 Информация о кеше Redis
+    cache_info = {"status": "disabled", "keys_count": 0, "memory_usage": "N/A"}
+    if redis_client:
+        try:
+            cache_info = {
+                "status": "connected",
+                "keys_count": len(redis_client.keys("*")),
+                "memory_usage": redis_client.info("memory").get("used_memory_human", "N/A"),
+                "sample_keys": redis_client.keys("*")[:10]  # Первые 10 ключей для примера
+            }
+        except Exception as e:
+            cache_info = {"status": "error", "error": str(e)}
+    
     return {
         "total_requests": api_stats["requests_count"],
         "total_errors": api_stats["errors_count"],
@@ -543,7 +655,8 @@ async def get_api_stats():
         "avg_response_time": round(avg_response_time, 3),
         "endpoints": api_stats["endpoints"],
         "top_groups": [{"group_id": gid, "requests": count} for gid, count in top_groups],
-        "top_teachers": [{"teacher": name, "requests": count} for name, count in top_teachers]
+        "top_teachers": [{"teacher": name, "requests": count} for name, count in top_teachers],
+        "cache": cache_info
     }
 
 
