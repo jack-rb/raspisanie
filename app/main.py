@@ -322,14 +322,21 @@ async def verify_init_data(request: Request, x_telegram_initdata: str = Header(N
 def _is_telegram_webview(request: Request) -> bool:
     ua = (request.headers.get("user-agent") or "").lower()
     referer = (request.headers.get("referer") or "").lower()
+    url_path = str(request.url.path)
     
     # Логируем для отладки
     logger.info("🔍 User-Agent: %s", ua)
     logger.info("🔍 Referer: %s", referer)
+    logger.info("🔍 Path: %s", url_path)
     
-    # Проверяем referer на Telegram Web
+    # 🚀 Веб Телеграм ВСЕГДА должен проходить (расслабляем проверки)
     if "web.telegram.org" in referer:
         logger.info("✅ Telegram Web detected via referer")
+        return True
+    
+    # 🚀 Если есть telegram в referer - тоже пропускаем
+    if "telegram" in referer:
+        logger.info("✅ Telegram detected via telegram in referer")
         return True
     
     # Проверяем User-Agent маркеры
@@ -352,7 +359,15 @@ def _is_telegram_webview(request: Request) -> bool:
             logger.info("✅ Telegram detected via initData header: %s", header)
             return True
     
-    # Если нет ни маркеров, ни заголовков - это обычный браузер
+    # 🚀 ВАЖНО: Если нет явных признаков браузера - считаем Telegram (более мягкая логика)
+    browser_markers = ["mozilla", "chrome", "safari", "edge", "firefox"]
+    is_browser = any(marker in ua for marker in browser_markers)
+    
+    if not is_browser:
+        logger.info("✅ Non-browser user agent, assuming Telegram")
+        return True
+    
+    # Если явно браузер без Telegram маркеров - показываем заглушку
     logger.info("❌ Regular browser detected (no Telegram markers)")
     return False
 
@@ -627,7 +642,7 @@ async def config_public():
     return {
         "bot_username": settings.BOT_USERNAME,
         "domain": settings.DOMAIN,
-        "app_version": "v1.22"
+        "app_version": "v1.23"
     }
 
 @app.get("/admin/stats")
