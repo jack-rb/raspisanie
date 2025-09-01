@@ -189,6 +189,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Простая конфигурация
+
 # --- SlowAPI Limiter ---
 # Кастомная функция для извлечения user_id из Init Data
 
@@ -265,6 +267,9 @@ def _extract_init_data(request: Request, x_telegram_initdata: str | None) -> tup
 def check_telegram_init_data(init_data: str, src: str) -> bool:
     if settings.ALLOW_PUBLIC:
         return True
+    
+    TELEGRAM_BOT_TOKEN = settings.BOT_TOKEN
+    
     if not TELEGRAM_BOT_TOKEN or not init_data:
         logger.warning("InitData empty or no BOT_TOKEN (src=%s)", src)
         return False
@@ -299,6 +304,7 @@ def check_telegram_init_data(init_data: str, src: str) -> bool:
 async def verify_init_data(request: Request, x_telegram_initdata: str = Header(None)):
     if settings.ALLOW_PUBLIC:
         return True
+    
     # 1) читаем тело для POST
     init_data_body = None
     try:
@@ -544,6 +550,7 @@ async def get_lessons(
 @app.get("/teachers/", response_model=List[Teacher])
 @track_performance("get_teachers")
 async def get_teachers(
+    request: Request,
     user: dict = Depends(verify_telegram_mini_app),
     db: Session = Depends(get_db)
 ):
