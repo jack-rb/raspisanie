@@ -61,7 +61,7 @@ deploy:
         docker compose version
       fi
 
-      # Создаём/обновляем docker-compose.yml на сервере (вставляем образ напрямую)
+      # Создаём/обновляем docker-compose.yml на сервере
       cat > /opt/schedule-bot/docker-compose.yml << COMPOSE
       version: '3.8'
       services:
@@ -73,24 +73,42 @@ deploy:
             - "8000:8000"
           volumes:
             - ./data:/app/data
+          depends_on:
+            - redis
+
+        redis:
+          image: redis:7-alpine
+          restart: unless-stopped
+          ports:
+            - "6379:6379"
+          command: redis-server --requirepass \${REDIS_PASSWORD:-schedule_cache_2025} --maxmemory 100mb --maxmemory-policy allkeys-lru
+          volumes:
+            - redis_data:/data
+
+      volumes:
+        redis_data:
       COMPOSE
 
-      # Создаём/обновляем .env на сервере (значения приходят из GitLab CI Variables)
+      # Создаём/обновляем .env на сервере
       cat > /opt/schedule-bot/.env << ENVFILE
       DATABASE_URL=${DATABASE_URL}
       BOT_TOKEN=${BOT_TOKEN}
+      BOT_USERNAME=${BOT_USERNAME}
       DOMAIN=${DOMAIN}
       REDIS_HOST=${REDIS_HOST:-redis}
       REDIS_PORT=${REDIS_PORT:-6379}
       REDIS_DB=${REDIS_DB:-0}
+      REDIS_PASSWORD=${REDIS_PASSWORD}
       SUBDOMAIN_ENABLED=${SUBDOMAIN_ENABLED:-true}
       ALLOW_PUBLIC=${ALLOW_PUBLIC:-true}
       ENVFILE
+
+
 
       docker login ${CI_REGISTRY} -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
       cd /opt/schedule-bot
       docker compose pull
       docker compose up -d --remove-orphans
-      sleep 2
+      sleep 10
       curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/ || true
       EOF 
