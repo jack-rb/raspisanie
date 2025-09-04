@@ -198,44 +198,75 @@ function displaySchedule(schedule, selectedDate) {
     }
 }
 
-// Вспомогательная функция для fetch с initData
+// Вспомогательная функция для fetch с initData или веб-версии
 async function fetchWithInitData(url, options = {}) {
     const tg = window.Telegram.WebApp;
     const initData = tg && tg.initData ? tg.initData : '';
-    // Если нет initData, сразу просим открыть через Telegram и прекращаем
-    if (!initData) {
-        await showOpenInTelegram();
-        throw new Error('No initData available');
+    const isWebVersion = urlParams.get('web') === '1';
+
+    // Для веб-версии не требуем initData
+    if (isWebVersion) {
+        // Добавляем параметр ?web=1 к URL если его там нет
+        const urlObj = new URL(url, window.location.origin);
+        if (!urlObj.searchParams.get('web')) {
+            urlObj.searchParams.set('web', '1');
+            url = urlObj.pathname + urlObj.search;
+        }
+    } else {
+        // Для Telegram TMA требуем initData
+        if (!initData) {
+            await showOpenInTelegram();
+            throw new Error('No initData available');
+        }
     }
-    const commonHeaders = {
-        'X-Telegram-InitData': initData,
-        'Telegram-Init-Data': initData,
-        'X-Telegram-Web-App-Data': initData
-    };
+
+    // Для веб-версии не отправляем заголовки с initData
+    const commonHeaders = {};
+    if (!isWebVersion && initData) {
+        commonHeaders['X-Telegram-InitData'] = initData;
+        commonHeaders['Telegram-Init-Data'] = initData;
+        commonHeaders['X-Telegram-Web-App-Data'] = initData;
+    }
+
     if (!options.method || options.method.toUpperCase() === 'GET') {
         options.headers = Object.assign({}, options.headers || {}, commonHeaders);
         const resp = await fetch(url, options);
-        if (resp.status === 401) {
-            await showOpenInTelegram();
-            throw new Error('Unauthorized');
-        } else if (resp.status === 302) {
-            await showOpenInTelegram();
-            throw new Error('Redirect to Telegram');
+
+        // Для веб-версии не показываем ошибки авторизации
+        if (!isWebVersion) {
+            if (resp.status === 401) {
+                await showOpenInTelegram();
+                throw new Error('Unauthorized');
+            } else if (resp.status === 302) {
+                await showOpenInTelegram();
+                throw new Error('Redirect to Telegram');
+            }
         }
+
         return resp;
     } else {
         let body = options.body ? JSON.parse(options.body) : {};
-        body.initData = initData;
+
+        // Для веб-версии не добавляем initData
+        if (!isWebVersion && initData) {
+            body.initData = initData;
+        }
+
         options.body = JSON.stringify(body);
         options.headers = Object.assign({}, options.headers || {}, { 'Content-Type': 'application/json' }, commonHeaders);
         const resp = await fetch(url, options);
-        if (resp.status === 401) {
-            await showOpenInTelegram();
-            throw new Error('Unauthorized');
-        } else if (resp.status === 302) {
-            await showOpenInTelegram();
-            throw new Error('Redirect to Telegram');
+
+        // Для веб-версии не показываем ошибки авторизации
+        if (!isWebVersion) {
+            if (resp.status === 401) {
+                await showOpenInTelegram();
+                throw new Error('Unauthorized');
+            } else if (resp.status === 302) {
+                await showOpenInTelegram();
+                throw new Error('Redirect to Telegram');
+            }
         }
+
         return resp;
     }
 }
