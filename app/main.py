@@ -397,6 +397,12 @@ def _extract_user_from_init_data(init_data: str) -> dict | None:
     return None
 
 async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = Header(None)):
+    # Проверяем веб-версию (?web=1) - разрешаем доступ для браузеров
+    query_params = dict(request.query_params)
+    if query_params.get('web') == '1':
+        # Веб-версия - разрешаем анонимный доступ
+        return {"user_id": "web_user", "username": "web_user"}
+
     # Проверяем что запрос идёт из Telegram WebView
     if not _is_telegram_webview(request):
         bot_username = settings.BOT_USERNAME or ""
@@ -433,17 +439,7 @@ async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = 
 @app.get("/")
 async def root(request: Request):
     """Главная страница расписания - адаптивная для браузера и Telegram"""
-    # Проверяем параметр ?web=1 для принудительной веб-версии
-    query_params = dict(request.query_params)
-    if query_params.get('web') == '1':
-        # Веб-версия - возвращаем обычный index.html с баннером
-        return FileResponse("static/index.html")
-
-    if not _is_telegram_webview(request):
-        # Браузер без параметра web=1 - перенаправляем на веб-версию
-        return RedirectResponse(url="/?web=1")
-
-    # Telegram WebView - обычный TMA режим
+    # Всегда возвращаем index.html - логика веб/Telegram обрабатывается в JavaScript
     return FileResponse("static/index.html")
 
 
