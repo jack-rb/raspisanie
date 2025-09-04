@@ -1,6 +1,18 @@
+// Проверяем веб-версию
+const urlParams = new URLSearchParams(window.location.search);
+const isWebVersion = urlParams.get('web') === '1';
+
 document.addEventListener('DOMContentLoaded', function() {
 const tg = window.Telegram.WebApp;
-tg.expand();
+
+// Если веб-версия - показываем баннер и включаем полный функционал
+if (isWebVersion) {
+    showWebBanner();
+    enableFullFunctionality();
+} else {
+    // Обычный TMA режим
+    tg.expand();
+}
 
 function getCurrentDateUTC4() {
     const date = new Date();
@@ -517,9 +529,35 @@ setupModeButtons();
 
 
 
+// Функции для веб-версии
+function showWebBanner() {
+    const banner = document.createElement('div');
+    banner.className = 'web-banner';
+    banner.innerHTML = `
+        <div class="telegram-banner">
+            <div>📱 Откройте полную версию в Telegram для лучшего опыта</div>
+            <div class="telegram-buttons">
+                <a class='telegram-btn' href='https://t.me/rasp_psuti_bot?startapp=go' target='_blank'>📱 Телефон</a>
+                <a class='telegram-btn secondary' href='https://web.telegram.org/k/#@rasp_psuti_bot' target='_blank'>💻 Веб</a>
+            </div>
+        </div>
+    `;
+    document.body.insertBefore(banner, document.body.firstChild);
+}
+
+function enableFullFunctionality() {
+    // Убираем ограничения TMA
+    console.log('🌐 Веб-версия активирована - полный функционал доступен');
+
+    // Можно добавить дополнительные функции для веб-версии
+    // Например, улучшенную навигацию, дополнительные кнопки и т.д.
+}
+
 // Инициализация
 (async function initApp(){
-    tg.ready();
+    if (!isWebVersion) {
+        tg.ready();
+    }
     updateTodayDate();
     await loadGroups();
     initDatePicker();

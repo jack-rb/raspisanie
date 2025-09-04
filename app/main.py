@@ -432,10 +432,18 @@ async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = 
 
 @app.get("/")
 async def root(request: Request):
-    """Главная страница расписания ПГУТИ (только через Telegram WebView)"""
+    """Главная страница расписания - адаптивная для браузера и Telegram"""
+    # Проверяем параметр ?web=1 для принудительной веб-версии
+    query_params = dict(request.query_params)
+    if query_params.get('web') == '1':
+        # Веб-версия - возвращаем обычный index.html с баннером
+        return FileResponse("static/index.html")
+
     if not _is_telegram_webview(request):
-        # Показываем красивую страницу с предложением открыть в Telegram
-        return FileResponse("static/browser-redirect.html")
+        # Браузер без параметра web=1 - перенаправляем на веб-версию
+        return RedirectResponse(url="/?web=1")
+
+    # Telegram WebView - обычный TMA режим
     return FileResponse("static/index.html")
 
 

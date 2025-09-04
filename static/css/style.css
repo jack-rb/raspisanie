@@ -329,4 +329,73 @@ body {
         font-size: 14px; /* was 12px */
         padding: 8px; /* was 6px */
     }
+}
+
+/* Стили для веб-версии */
+.web-banner {
+    background: linear-gradient(135deg, #0088cc, #0055aa);
+    color: #fff;
+    padding: 12px;
+    text-align: center;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 136, 204, 0.3);
+}
+
+.telegram-banner {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.telegram-banner div:first-child {
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.telegram-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.telegram-btn {
+    display: inline-block;
+    background: #fff;
+    color: #0088cc;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.telegram-btn:hover {
+    background: #f0f0f0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.telegram-btn.secondary {
+    background: #333;
+    color: #fff;
+}
+
+.telegram-btn.secondary:hover {
+    background: #555;
+}
+
+/* Адаптивность для веб-баннера */
+@media (max-width: 480px) {
+    .telegram-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .telegram-btn {
+        width: 200px;
+        text-align: center;
+    }
 } 
