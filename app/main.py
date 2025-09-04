@@ -439,11 +439,7 @@ async def verify_telegram_mini_app(request: Request, x_telegram_initdata: str = 
 @app.get("/")
 async def root(request: Request):
     """Главная страница расписания - адаптивная для браузера и Telegram"""
-    # Если браузер - перенаправляем на веб-версию
-    if not _is_telegram_webview(request):
-        return RedirectResponse(url="/?web=1")
-
-    # Telegram - обычный интерфейс
+    # Всегда возвращаем index.html - логика веб/Telegram обрабатывается в JavaScript
     return FileResponse("static/index.html")
 
 

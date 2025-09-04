@@ -1,9 +1,19 @@
-// Проверяем веб-версию
+// Проверяем тип клиента
 const urlParams = new URLSearchParams(window.location.search);
 const isWebVersion = urlParams.get('web') === '1';
+const isTelegramWebView = window.Telegram?.WebApp?.initData !== undefined;
 
 document.addEventListener('DOMContentLoaded', function() {
 const tg = window.Telegram.WebApp;
+
+// Если это браузер (не Telegram) - автоматически добавляем ?web=1
+if (!isTelegramWebView && !isWebVersion) {
+    // Добавляем параметр web=1 к текущему URL
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('web', '1');
+    window.location.href = currentUrl.toString();
+    return; // Прерываем выполнение
+}
 
 // Если веб-версия - показываем баннер и включаем полный функционал
 if (isWebVersion) {
